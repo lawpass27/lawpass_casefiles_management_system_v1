@@ -1,0 +1,189 @@
+# 기본 설정
+general:
+  source_folder: "D:\\전자소송다운로드"  # 전자소송 다운로드 폴더 경로
+  case_folder: ""  # 사건 폴더 경로
+  backup_folder: "D:\\전자소송다운로드 백업"  # 백업 폴더 경로
+
+# 파일 관리 설정
+file_management:
+  original_folder_name: "원본폴더"  # 원본 파일 보관 폴더명
+  markdown_folder_name: "마크다운"  # 마크다운 파일 보관 폴더명
+  backup_enabled: true  # 백업 기능 활성화 여부
+
+# 2차 파일명 변경 규칙
+file_naming_rules:
+  prefix_patterns:
+    "1_기본정보_": 
+    "2_사건개요_": 
+      - "관련증거"
+    "3_사실관계_":
+    "4_기준판례_":
+      - "판례"
+      - "관련판례"
+      - "결정"
+    "5_관련법리_":
+      - "법리"
+    "6_논리구성_":
+    "7_제출증거_":
+      - "갑[0-9]+(-[0-9]+)?"
+      - "을[0-9]+(-[0-9]+)?"
+      - "녹취서"
+      - "녹취서요지"
+      - "증인신문사항"
+      - "증인신문조서"
+      - "사실조회서"
+      - "사실조회 회신서"
+      - "사실조회회신서"
+      - "문서송부촉탁서"
+    "8_제출서면_":
+      - "항소장"
+      - "소장"
+      - "답변서"
+      - "준비서면"
+      - "사실조회신청서"
+      - "증인신청서"
+      - "감정신청서"
+      - "문서송부촉탁신청서"
+      - "의견서"
+      - "변론요지서"
+      - "청구취지변경"
+      - "청구원인변경"
+      - "기일변경"
+      - "최후변론"
+      - "증거설명서"
+      - "변론조서"
+      - "판결선고조서"
+      - "선고조서"
+      - "항소이유서"
+    "9_판결_":
+      - "판결문"
+      - "결정문"
+
+# 텍스트 추출 설정
+text_extraction:
+  enabled: true  # 텍스트 추출 기능 활성화 여부
+  target_prefixes: ["7_제출증거_", "8_제출서면_", "9_판결_"]
+  output_format: "markdown"  # 출력 형식
+  
+  # OCR 설정
+  use_ocr: true  # OCR 사용 여부
+  use_ocr_on_error: true  # 텍스트 추출 실패 시 OCR 시도 여부
+  ocr_language_hints:
+    - "ko"
+    - "en"
+  ocr_dpi: 120  # OCR 이미지 해상도
+  poppler_path: "C:/Program Files/poppler-0.68.0/bin"  # Poppler 경로 (PDF를 이미지로 변환하는 데 필요)
+  google_credentials_path: "C:/Users/lawpa/.config/pdf2text/credentials.json"  # Google Cloud Vision API 인증 정보 경로
+  
+  # 텍스트 추출 실패 시 대체 방법 설정
+  fallback_methods:
+    # PyPDF2를 사용한 텍스트 추출 시도 (OCR 실패 시)
+    use_pypdf2: false
+    
+    # Tesseract OCR 사용 (Google Vision API 실패 시)
+    use_tesseract: false
+    tesseract_path: "C:/Program Files/Tesseract-OCR/tesseract.exe"
+  
+  # 병렬 처리 설정
+  # 페이지 병렬 처리에 사용할 최대 워커 수 (기본값: CPU 코어 수의 절반)
+  max_workers: 4
+  
+  # 파일 병렬 처리에 사용할 최대 워커 수 (기본값: 2)
+  max_workers_files: 2
+  
+  # 증거 추출 양식 설정
+  evidence_template:
+    # 증거 파일 패턴 (정규식)
+    patterns:
+      - "갑\\d+"
+      - "갑\\d+-\\d+"
+      - "을\\d+"
+      - "을\\d+-\\d+"
+      - "서증"
+    # 증거 추출 메타데이터 양식
+    metadata_template: |
+      ```
+      증거명: {filename}
+      제출자: 
+      증거작성일: {evidence_date}
+      진정성립여부: 
+      증거능력여부: 
+      증거요지: 
+      입증취지: 
+      관련요건사실: 
+      직접증거여부: 
+      원본링크: {original_file}
+      원본문서제목: {original_file_name}
+      원본문서경로: {original_file_path}
+      생성일시: {extraction_date}
+      총페이지수: {page_count}
+      ```
+  
+  # 서면 추출 양식 설정
+  submission_template:
+    # 서면 파일 패턴 (정규식)
+    patterns:
+      - "소장"
+      - "소송위임장"
+      - "답변서"
+      - "준비서면"
+      - "신청서"
+      - "의견서"
+      - "청구취지변경"
+      - "청구원인변경"
+      - "최후변론"
+      - "증거설명"
+      - "변론조서"
+      - "석명준비"
+      - "보정권고"
+      - "보정서"
+      - "보정명령"
+    # 서면 추출 메타데이터 양식
+    metadata_template: |
+      ```
+      서면명: {filename}
+      제출자: 
+      제출일: 
+      서면요지: 
+      원본링크: {pdf_path}
+      원본문서제목: {pdf_name_without_ext}
+      원본문서경로: {pdf_path}
+      생성일시: {datetime}
+      총페이지수: {page_count}
+      ```
+
+  # 판결문 추출 양식 설정
+  judgment_template:
+    # 판결문 파일 패턴 (정규식)
+    patterns:
+      - "판결문"
+      - "결정문"
+    # 판결문 추출 메타데이터 양식
+    metadata_template: |
+      ```
+      사건번호: 
+      선고일자: 
+      법원명: 
+      재판부: 
+      판결요지: 
+      원본링크: {original_file}
+      원본문서제목: {original_file_name}
+      원본문서경로: {original_file_path}
+      생성일시: {extraction_date}
+      총페이지수: {page_count}
+      ```
+
+# 백업 정책 설정
+backup_policy:
+  retention_days: 30  # 백업 파일 보관 기간 (일)
+  max_size_gb: 10     # 백업 폴더 최대 용량 (GB)
+  cleanup_interval: 7  # 백업 파일 정리 주기 (일)
+
+# 로깅 설정
+logging:
+  level: "INFO"  # 로그 레벨 (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+  file: "file_manager.log"  # 로그 파일명
+  max_size: 10485760  # 최대 로그 파일 크기 (10MB)
+  backup_count: 3  # 백업 로그 파일 수
+  log_dir: "logs"  # 로그 파일 저장 디렉토리
+  retention_days: 90  # 로그 보관 기간 (일) 
