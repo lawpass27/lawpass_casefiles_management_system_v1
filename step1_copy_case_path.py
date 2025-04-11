@@ -5,7 +5,7 @@ import sys
 def list_and_copy_folder_path(target_dir):
     """
     지정된 디렉토리의 하위 폴더 목록을 보여주고, 사용자가 선택한 폴더의
-    전체 경로를 클립보드에 복사합니다.
+    전체 경로를 클립보드에 복사하고 case_path.txt 파일에 저장합니다.
     """
     # 대상 디렉토리가 실제로 존재하는지 확인
     if not os.path.isdir(target_dir):
@@ -50,6 +50,16 @@ def list_and_copy_folder_path(target_dir):
                         print(f"\n❌ 오류: 클립보드 복사 중 문제가 발생했습니다. 에러: {clip_err}")
                         print("수동으로 경로를 복사하세요:")
                         print(full_path)
+
+                    # 파일에 경로 저장
+                    try:
+                        with open("case_path.txt", "w", encoding="utf-8") as f:
+                            f.write(full_path)
+                        print(f"✅ 성공: '{full_path}' 경로가 case_path.txt 파일에 저장되었습니다.")
+                    except Exception as save_err:
+                        print(f"❌ 오류: 경로를 파일에 저장하는 중 문제가 발생했습니다. 에러: {save_err}")
+                        print("프로그램이 계속 진행되지만, 다음 단계에서 문제가 발생할 수 있습니다.")
+
                     break # 성공적으로 복사 후 루프 종료
                 else:
                     print(f"❌ 잘못된 번호입니다. 1부터 {len(subdirs)} 사이의 번호를 입력하거나 'c'를 입력하세요.")

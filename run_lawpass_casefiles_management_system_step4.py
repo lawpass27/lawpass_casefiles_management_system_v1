@@ -4,6 +4,85 @@ import time
 import subprocess
 from typing import Tuple
 
+def get_user_confirmation(step_number: int, script_name: str, case_folder: str) -> Tuple[bool, bool]:
+    """
+    각 단계 실행 전 사용자 확인을 받는 함수
+
+    Args:
+        step_number: 단계 번호
+        script_name: 실행할 스크립트 이름
+        case_folder: 사건 폴더 경로
+
+    Returns:
+        Tuple[bool, bool]: (계속 진행 여부, 건너뛰기 여부)
+    """
+    print(f"\n{'='*50}")
+    print(f"Step {step_number} 실행 준비: {script_name}")
+    if case_folder:
+        print(f"사건 폴더: {case_folder}")
+    print('='*50)
+
+    # 단계별 추가 정보 표시
+    if step_number == 1:
+        print("이 단계에서는 사건 폴더를 선택합니다.")
+    elif step_number == 2:
+        print("이 단계에서는 선택한 사건 폴더에 표준 폴더 구조를 생성합니다.")
+        print("생성될 폴더: 0_INBOX, 1_기본정보, 2_사건개요, 3_기준판례, 등")
+    elif step_number == 3:
+        print("이 단계에서는 전자소송 다운로드 폴더에서 사건 폴더로 파일을 복사합니다.")
+        print(f"원본 폴더: {os.path.join(case_folder, '원본폴더')}")
+    elif step_number == 4:
+        print("이 단계에서는 복사된 파일의 이름을 표준 규칙에 맞게 변경합니다.")
+
+    while True:
+        choice = input("\n이 단계를 실행하시겠습니까? (y: 실행, n: 종료, s: 건너뛰기, 엔터: 실행): ").lower()
+        if choice == 'y' or choice == '':
+            return True, False  # (계속 진행, 건너뛰기 안함)
+        elif choice == 'n':
+            print("사용자 요청으로 프로그램을 종료합니다.")
+            return False, False  # (종료, 건너뛰기 안함)
+        elif choice == 's':
+            print(f"Step {step_number}을(를) 건너뜁니다.")
+            return True, True  # (계속 진행, 건너뛰기)
+        else:
+            print("잘못된 입력입니다. 'y', 'n', 's' 또는 엔터를 입력하세요.")
+
+def confirm_and_modify_path(path, description):
+    """
+    경로를 확인하고 필요한 경우 수정할 수 있는 함수
+
+    Args:
+        path: 확인할 경로
+        description: 경로에 대한 설명
+
+    Returns:
+        str: 확인되거나 수정된 경로
+    """
+    print(f"\n현재 {description}: {path}")
+
+    while True:
+        choice = input("이 경로를 사용하시겠습니까? (y: 사용, n: 수정, 엔터: 사용): ").lower()
+        if choice == 'y' or choice == '':
+            return path
+        elif choice == 'n':
+            new_path = input("새 경로를 입력하세요: ").strip()
+            if os.path.exists(new_path):
+                print(f"✅ 새 경로가 확인되었습니다: {new_path}")
+
+                # 새 경로를 case_path.txt에 저장
+                try:
+                    with open("case_path.txt", "w", encoding="utf-8") as f:
+                        f.write(new_path)
+                    print("✅ 새 경로가 case_path.txt 파일에 저장되었습니다.")
+                except Exception as e:
+                    print(f"❌ 경로 저장 중 오류 발생: {e}")
+
+                return new_path
+            else:
+                print(f"❌ 지정된 경로가 존재하지 않습니다: {new_path}")
+        else:
+            print("잘못된 입력입니다. 'y', 'n' 또는 엔터를 입력하세요.")
+
 def verify_step_result(step_number: int, case_folder: str) -> Tuple[bool, str]:
     """각 스텝의 결과물을 검증하는 함수"""
     try:
@@ -84,26 +163,36 @@ def main():
     """메인 실행 함수"""
     print("법률사건 문서 처리 파이프라인 시작 (Step 4까지 실행)\n")
 
-    # Step 1 실행 및 사건 폴더 경로 획득
-    print("Step 1: 사건 폴더 선택")
-    print("사건 폴더를 선택하고 엔터를 누르면 다음 단계로 진행합니다...")
-    print("사건 폴더 목록이 표시되지 않으면 경로를 확인해주세요.")
-
-    # step1_copy_case_path.py 실행
-    script_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "step1_copy_case_path.py")
-    print(f"Step 1 스크립트 경로: {script_path}")
-    success = run_step(1, "step1_copy_case_path.py", "")  # case_folder는 step1에서 결정
-    if not success:
-        print("❌ Step 1 실패. 프로그램을 종료합니다.")
+    # Step 1 실행 전 사용자 확인
+    continue_execution, skip_step = get_user_confirmation(1, "step1_copy_case_path.py", "")
+    if not continue_execution:
         return 1
 
-    # 사용자가 엔터를 누르기를 기다림
-    input("\n사건 폴더 선택이 완료되었습니다. 엔터를 누르면 다음 단계로 진행합니다...")
+    if not skip_step:
+        # Step 1 실행 및 사건 폴더 경로 획득
+        print("Step 1: 사건 폴더 선택")
+        print("사건 폴더를 선택하고 엔터를 누르면 다음 단계로 진행합니다...")
+        print("사건 폴더 목록이 표시되지 않으면 경로를 확인해주세요.")
+
+        # step1_copy_case_path.py 실행
+        script_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "step1_copy_case_path.py")
+        print(f"Step 1 스크립트 경로: {script_path}")
+        success = run_step(1, "step1_copy_case_path.py", "")  # case_folder는 step1에서 결정
+        if not success:
+            print("❌ Step 1 실패. 프로그램을 종료합니다.")
+            return 1
+
+        # 사용자가 엔터를 누르기를 기다림
+        input("\n사건 폴더 선택이 완료되었습니다. 엔터를 누르면 다음 단계로 진행합니다...")
 
     # step1_copy_case_path.py 실행 후 생성된 case_path.txt 파일에서 경로를 읽어옴
     try:
         with open("case_path.txt", "r", encoding="utf-8") as f:
             case_folder = f.readline().strip()
+
+        # 경로 확인 및 수정
+        case_folder = confirm_and_modify_path(case_folder, "사건 폴더 경로")
+
         if not os.path.exists(case_folder):
             print(f"❌ 지정된 폴더가 존재하지 않습니다: {case_folder}")
             return 1
@@ -123,6 +212,15 @@ def main():
     ]
 
     for step_number, script_name in steps:
+        # 각 스텝 실행 전 사용자 확인
+        continue_execution, skip_step = get_user_confirmation(step_number, script_name, case_folder)
+        if not continue_execution:
+            return 1
+
+        if skip_step:
+            print(f"Step {step_number} 건너뛰기")
+            continue
+
         # 각 스텝 사이에 잠시 대기
         time.sleep(1)
 

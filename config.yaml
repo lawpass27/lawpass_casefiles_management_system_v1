@@ -15,14 +15,9 @@ file_naming_rules:
   prefix_patterns:
     "1_기본정보_": 
     "2_사건개요_": 
-      - "관련증거"
     "3_사실관계_":
     "4_기준판례_":
-      - "판례"
-      - "관련판례"
-      - "결정"
     "5_관련법리_":
-      - "법리"
     "6_논리구성_":
     "7_제출증거_":
       - "갑[0-9]+(-[0-9]+)?"
@@ -35,6 +30,7 @@ file_naming_rules:
       - "사실조회 회신서"
       - "사실조회회신서"
       - "문서송부촉탁서"
+      - "참고자료"
     "8_제출서면_":
       - "항소장"
       - "소장"
@@ -54,10 +50,17 @@ file_naming_rules:
       - "변론조서"
       - "판결선고조서"
       - "선고조서"
+      - "항소장"
       - "항소이유서"
+      - "심판청구"
+      - "항고장"
+      - "항고이유서"
+      - "사전처분"
     "9_판결_":
       - "판결문"
       - "결정문"
+      - "심판문"
+      - "결정_정본"
 
 # 텍스트 추출 설정
 text_extraction:
@@ -71,7 +74,7 @@ text_extraction:
   ocr_language_hints:
     - "ko"
     - "en"
-  ocr_dpi: 120  # OCR 이미지 해상도
+  ocr_dpi: 300  # OCR 이미지 해상도 (정확도 향상을 위해 300 이상 권장)
   poppler_path: "C:/Program Files/poppler-0.68.0/bin"  # Poppler 경로 (PDF를 이미지로 변환하는 데 필요)
   google_credentials_path: "C:/Users/lawpa/.config/pdf2text/credentials.json"  # Google Cloud Vision API 인증 정보 경로
   
