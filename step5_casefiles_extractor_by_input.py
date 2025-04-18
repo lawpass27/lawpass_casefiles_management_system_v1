@@ -2,8 +2,9 @@
 """
 general_text_extractor.py
 
-지정된 폴더 내의 모든 PDF 및 이미지 파일에서 텍스트를 추출하여,
+지정된 폴더 내의 모든 PDF 및 이미지 파일 또는 단일 PDF/이미지 파일에서 텍스트를 추출하여,
 각 원본 파일과 동일한 이름의 마크다운 파일을 동일한 폴더에 생성합니다.
+사용자는 폴더 경로 또는 단일 파일 경로를 입력할 수 있으며, 스크립트는 자동으로 경로 유형을 감지합니다.
 추출 및 마크다운 형식은 기존 3_casefiles_extractor.py의 로직을 참조하도록 수정되었습니다.
 (페이지 구분 유지, 페이지 수 정보 전달, 템플릿 교체 준비)
 """
@@ -247,7 +248,7 @@ def detect_text_from_image(image_data):
         client_options = {}
         if credentials_path:
              client_options['credentials_path'] = credentials_path
-        
+
         # client = vision.ImageAnnotatorClient(**client_options) # options 사용 불가 -> 직접 설정 필요
         # 스레드 안전성을 위해 각 작업마다 client를 생성하거나, client 객체 자체를 인수로 전달해야 함.
         # 여기서는 환경 변수를 사용한 기존 방식 유지 (호출 전에 설정되었다고 가정)
@@ -472,6 +473,7 @@ def create_markdown_output(text, original_file_path, output_folder_path, config,
     else:
         formatted_text_for_md = "*추출된 텍스트가 없습니다.*"
     # --- 페이지 마커 추가 로직 끝 ---
+    logger.debug(f"마크다운용 포맷된 텍스트 (일부): {formatted_text_for_md[:500]}...") # 디버깅 로그 추가
 
     # 메타데이터 구성 (step5 로직 통합)
     metadata = {
@@ -543,6 +545,7 @@ def create_markdown_output(text, original_file_path, output_folder_path, config,
 
     # 파일 저장 로직 (기존과 동일)
     try:
+        logger.debug(f"파일에 쓸 최종 콘텐츠 (일부): {final_content[:500]}...") # 디버깅 로그 추가
         with open(md_filepath, 'w', encoding='utf-8') as f:
             f.write(final_content)
         logger.info(f"마크다운 파일 생성 완료: {md_filepath}")
@@ -558,7 +561,7 @@ def create_markdown_output(text, original_file_path, output_folder_path, config,
         logger.error(f"마크다운 생성 중 알 수 없는 오류: {md_filepath} - {e}", exc_info=True)
         print_message(f"오류: 마크다운 파일 생성 중 문제 발생 - {e}", "error")
         return None
-    
+
 # 단일 파일 처리 함수 (step5 로직 통합)
 def process_single_file(file_path, config):
     """단일 PDF 또는 이미지 파일 처리 (파일 유형 결정 및 전달)"""
@@ -686,7 +689,7 @@ def process_single_file(file_path, config):
         return None
 
 
-# 폴더 처리 함수 (수정됨: <0xEB><0x9B><0x84> 수정)
+# 폴더 처리 함수
 def process_folder(target_folder, config):
     """지정된 폴더 내의 모든 PDF 및 지원되는 이미지 파일 처리"""
     if not target_folder or not os.path.isdir(target_folder):
@@ -856,14 +859,47 @@ tags: [텍스트추출, {file_type_tag}]
     return template_str
 
 # --- 메인 실행 ---
+def process_input_path(input_path, config):
+    """입력된 경로가 폴더인지 파일인지 확인하고 적절한 처리 함수 호출"""
+    if not input_path or not os.path.exists(input_path):
+        print_message(f"오류: 유효하지 않은 경로입니다 - '{input_path}'", "error")
+        return
+
+    if os.path.isdir(input_path):
+        # 폴더 경로인 경우
+        print_message(f"폴더 경로가 감지되었습니다: [path]{input_path}[/]", "info")
+        print_message(f"폴더 내 모든 PDF 및 이미지 파일을 처리합니다.", "info")
+        process_folder(input_path, config)
+    elif os.path.isfile(input_path):
+        # 단일 파일 경로인 경우
+        filename = os.path.basename(input_path)
+        file_ext = os.path.splitext(filename)[1].lower()
+        supported_extensions = ['.pdf', '.jpg', '.jpeg', '.png', '.tif', '.tiff', '.bmp']
+
+        if file_ext in supported_extensions:
+            print_message(f"단일 파일이 감지되었습니다: [path]{input_path}[/]", "info")
+            print_message(f"단일 파일 처리 시작: [path]{input_path}[/]", "phase")
+            result = process_single_file(input_path, config)
+
+            if result:
+                print_message(f"파일 처리 성공: [filename_original]{filename}[/] -> [filename_new]{os.path.basename(result)}[/]", "success")
+            else:
+                print_message(f"파일 처리 실패: [filename_original]{filename}[/]", "error")
+        else:
+            print_message(f"오류: 지원되지 않는 파일 형식입니다 - '{filename}'", "error")
+            print_message(f"지원되는 형식: {', '.join(supported_extensions)}", "info")
+    else:
+        print_message(f"오류: '{input_path}'는 유효한 파일이나 폴더가 아닙니다.", "error")
+
 def main():
     """스크립트 메인 함수"""
     parser = argparse.ArgumentParser(
-        description='지정된 폴더 내 PDF 및 이미지 파일에서 텍스트를 추출하여 마크다운으로 저장합니다.',
+        description='지정된 폴더 내 모든 PDF/이미지 파일 또는 단일 PDF/이미지 파일에서 텍스트를 추출하여 마크다운으로 저장합니다.',
         formatter_class=argparse.RawTextHelpFormatter
     )
-    parser.add_argument('target_folder', nargs='?', default=None,
-                        help='텍스트를 추출할 파일들이 있는 폴더 경로 (생략 시 입력 요청)')
+    # input_path 인수는 더 이상 필수가 아님 (항상 입력받도록 변경)
+    parser.add_argument('--input_path', default=None,
+                        help='[사용되지 않음] 텍스트를 추출할 폴더 또는 파일 경로 (이제 항상 입력 요청)')
     parser.add_argument('--config', '-c', default='config.yaml',
                         help='사용자 설정 파일 경로 (기본값: config.yaml)')
     parser.add_argument('--log-level', default='INFO',
@@ -925,29 +961,44 @@ def main():
     logger.info(f"사용될 Google Credentials 경로: {creds_check if creds_check else '설정되지 않음'}")
 
 
-    # --- 대상 폴더 경로 확인 ---
-    target_folder_path = args.target_folder
-    if not target_folder_path:
-        prompt = "[question]텍스트를 추출할 폴더 경로를 입력하세요:[/]"
+    # --- 항상 사용자에게 경로 입력 요청 ---
+    prompt = "[question]텍스트를 추출할 폴더 또는 파일 경로를 입력하세요:[/]"
+    input_path = None # 초기화
+    while not input_path: # 유효한 경로가 입력될 때까지 반복
         try:
             if RICH_AVAILABLE:
-                target_folder_path = console.input(prompt)
+                input_path = console.input(prompt)
             else:
-                target_folder_path = input("텍스트를 추출할 폴더 경로를 입력하세요: ")
-            target_folder_path = target_folder_path.strip().strip('"\'') # 따옴표 제거 추가
-            if not target_folder_path:
-                print_message("오류: 폴더 경로가 입력되지 않았습니다.", "error")
-                sys.exit(1)
+                input_path = input("텍스트를 추출할 폴더 또는 파일 경로를 입력하세요: ")
+            input_path = input_path.strip().strip('"\'') # 따옴표 제거 추가
+
+            if not input_path:
+                print_message("오류: 경로가 입력되지 않았습니다. 다시 입력해주세요.", "error")
+                continue # 다시 입력 요청
+
+            # 입력받은 경로 정규화 및 절대 경로 변환
+            input_path = os.path.normpath(os.path.abspath(input_path))
+
+            # 경로 존재 여부 확인
+            if not os.path.exists(input_path):
+                print_message(f"오류: 입력된 경로를 찾을 수 없습니다: '{input_path}'. 다시 입력해주세요.", "error")
+                input_path = None # 경로 초기화하여 다시 입력받도록 함
+                continue # 다시 입력 요청
+
+            logger.info(f"처리 대상 경로: {input_path}")
+            break # 유효한 경로 입력 시 루프 탈출
+
         except (EOFError, KeyboardInterrupt):
             print_message("\n입력 취소. 스크립트를 종료합니다.", "warning")
             sys.exit(0)
 
-    # 입력받은 경로 정규화 및 절대 경로 변환
-    target_folder_path = os.path.normpath(os.path.abspath(target_folder_path))
-    logger.info(f"처리 대상 폴더: {target_folder_path}")
-
-    # --- 폴더 처리 실행 ---
-    process_folder(target_folder_path, config)
+    # --- 경로 처리 실행 ---
+    # input_path가 None이 아닌 경우 (유효한 경로가 입력된 경우)에만 처리 실행
+    if input_path:
+        process_input_path(input_path, config)
+    else:
+        # 이 경우는 이론상 발생하지 않아야 하지만, 안전 장치로 추가
+        logger.error("최종 처리 경로가 유효하지 않아 작업을 진행할 수 없습니다.")
 
     print_message("\n모든 작업 완료.", "phase")
     logger.info("텍스트 추출 작업 완료.")
