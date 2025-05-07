@@ -900,8 +900,9 @@ def main():
     # input_path 인수는 더 이상 필수가 아님 (항상 입력받도록 변경)
     parser.add_argument('--input_path', default=None,
                         help='[사용되지 않음] 텍스트를 추출할 폴더 또는 파일 경로 (이제 항상 입력 요청)')
-    parser.add_argument('--config', '-c', default='config.yaml',
-                        help='사용자 설정 파일 경로 (기본값: config.yaml)')
+    # 프로젝트 루트의 config.yaml 파일 경로로 수정
+    parser.add_argument('--config', '-c', default=os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'config.yaml'),
+                        help='사용자 설정 파일 경로 (기본값: 프로젝트 루트의 config.yaml)')
     parser.add_argument('--log-level', default='INFO',
                         choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'],
                         help='로그 상세 수준 설정 (기본값: INFO)')
