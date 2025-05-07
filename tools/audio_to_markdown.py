@@ -125,8 +125,7 @@ def transcribe_audio(audio_path, model_name="medium", use_gpu=True):
         language="ko",  # 한국어 지정
         task="transcribe",  # 음성-텍스트 변환 작업
         fp16=device == "cuda",  # GPU 사용 시 FP16 정밀도 사용
-        verbose=True,  # 진행 상황 표시
-        initial_prompt="이 오디오는 한국어로 녹음되었습니다."  # 한국어 인식 향상을 위한 프롬프트
+        verbose=True  # 진행 상황 표시
     )
 
     transcribe_time = time.time() - transcribe_start_time
@@ -353,8 +352,7 @@ def process_batch(folder_path, model_name="medium", use_gpu=True):
                     language="ko",
                     task="transcribe",
                     fp16=device == "cuda",
-                    verbose=False,
-                    initial_prompt="이 오디오는 한국어로 녹음되었습니다."
+                    verbose=False
                 )
 
                 # 마크다운 파일로 저장

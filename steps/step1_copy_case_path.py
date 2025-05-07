@@ -108,9 +108,9 @@ def list_and_copy_folder_path(parent_dirs):
 if __name__ == "__main__":
     # 여러 대상 디렉토리 경로 설정 (Raw string 사용)
     case_folder_paths = [
-        r"F:\내 드라이브\LifewithAI@20250120\Legalcases",
-        r"F:\내 드라이브\LifewithAI@20250120\Legalcases_(주)리하온",
-        r"F:\내 드라이브\LifewithAI@20250120\Legalcases_(주)대구농산"
+        r"F:\내 드라이브\LifewithAI-20250120\Legalcases",
+        r"F:\내 드라이브\LifewithAI-20250120\Legalcases_(주)리하온",
+        r"F:\내 드라이브\LifewithAI-20250120\Legalcases_(주)대구농산"
     ]
     list_and_copy_folder_path(case_folder_paths)
 
