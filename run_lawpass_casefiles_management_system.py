@@ -143,7 +143,7 @@ def verify_step_result(step_number: int, case_folder: str) -> Tuple[bool, str]:
 
 def run_step(step_number: int, script_name: str, case_folder: str) -> bool:
     """각 스텝을 실행하고 결과를 검증하는 함수"""
-    script_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), script_name)
+    script_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "steps", script_name)
 
     print(f"\n{'='*50}")
     print(f"Step {step_number} 실행: {script_name}")
@@ -208,7 +208,7 @@ def main():
         print("사건 폴더 목록이 표시되지 않으면 경로를 확인해주세요.")
 
         # step1_copy_case_path.py 실행
-        script_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "step1_copy_case_path.py")
+        script_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "steps", "step1_copy_case_path.py")
         print(f"Step 1 스크립트 경로: {script_path}")
         success = run_step(1, "step1_copy_case_path.py", "")  # case_folder는 step1에서 결정
         if not success:
