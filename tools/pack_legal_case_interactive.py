@@ -66,6 +66,18 @@ def pack_legal_case(case_path):
     # 출력 디렉토리 생성
     os.makedirs(OUTPUT_PATH, exist_ok=True)
 
+    # 백업 디렉토리 생성
+    backup_path = os.path.join(os.path.dirname(OUTPUT_PATH), os.path.basename(OUTPUT_PATH) + "_backup")
+    os.makedirs(backup_path, exist_ok=True)
+
+    # 기존 파일 확인 및 백업
+    existing_files = [f for f in os.listdir(OUTPUT_PATH) if f.startswith(case_name)]
+    for existing_file in existing_files:
+        existing_file_path = os.path.join(OUTPUT_PATH, existing_file)
+        backup_file_path = os.path.join(backup_path, existing_file)
+        print(f"기존 파일 백업: {existing_file_path} -> {backup_file_path}")
+        os.rename(existing_file_path, backup_file_path)
+
     # Repomix 실행
     try:
         print(f"사건 폴더 압축 중: {case_path}")
