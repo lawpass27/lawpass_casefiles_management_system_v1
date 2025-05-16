@@ -8,8 +8,8 @@ import pytz
 import time
 
 # 설정
-VAULT_PATH = r"F:\\내 드라이브\\LifewithAI-20250120"
-OUTPUT_PATH = r"F:\\내 드라이브\\LifewithAI-20250120\\Legalcases_repomix"
+VAULT_PATH = r"D:\\GoogleDriveStreaming\\내 드라이브\\LifewithAI-20250120"
+OUTPUT_PATH = r"D:\\GoogleDriveStreaming\\내 드라이브\\LifewithAI-20250120\\Legalcases_repomix"
 REPOMIX_PATH = r"D:\\Claude_MCP_Servers\\repomix\\bin\\repomix.cjs"
 
 # 법률 폴더 목록
@@ -32,6 +32,7 @@ def get_legal_cases():
                 entries = [entry for entry in os.listdir(legal_folder_path)
                           if os.path.isdir(os.path.join(legal_folder_path, entry))]
 
+                # _INBOX 폴더 제외 (대소문자 구분 없이)
                 case_folders = [
                     {
                         "name": entry,
@@ -39,6 +40,7 @@ def get_legal_cases():
                         "parentFolder": legal_folder
                     }
                     for entry in entries
+                    if "_inbox" not in entry.lower()  # 대소문자 구분 없이 _inbox가 포함되지 않은 항목만 포함
                 ]
 
                 all_case_folders.extend(case_folders)
@@ -121,7 +123,9 @@ def main():
         if current_parent != case_folder["parentFolder"]:
             current_parent = case_folder["parentFolder"]
             print(f"\n[{current_parent}]")
-        print(f"{i + 1}. {case_folder['name']} ({case_folder['path']})")
+        # 한 자리 수일 경우 앞에 0을 붙여 두 자리로 표시, 괄호 안의 경로는 표시하지 않음
+        index_str = f"{i + 1:02d}"
+        print(f"{index_str}. {case_folder['name']}")
 
     # 사용자 입력 받기
     answer = input("\n패키징할 사건 폴더의 번호 또는 경로를 입력하세요: ")
