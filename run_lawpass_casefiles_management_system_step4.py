@@ -27,7 +27,7 @@ def get_user_confirmation(step_number: int, script_name: str, case_folder: str) 
         print("이 단계에서는 사건 폴더를 선택합니다.")
     elif step_number == 2:
         print("이 단계에서는 선택한 사건 폴더에 표준 폴더 구조를 생성합니다.")
-        print("생성될 폴더: 0_INBOX, 1_기본정보, 2_사건개요, 3_기준판례, 등")
+        print("생성될 폴더: 0_INBOX, 1_기본정보, 2_사건개요, 3_사실관계, 등")
     elif step_number == 3:
         print("이 단계에서는 전자소송 다운로드 폴더에서 사건 폴더로 파일을 복사합니다.")
         print(f"원본 폴더: {os.path.join(case_folder, '원본폴더')}")
@@ -89,8 +89,8 @@ def verify_step_result(step_number: int, case_folder: str) -> Tuple[bool, str]:
         if step_number == 2:
             # Step 2: 표준 폴더 구조 확인
             required_folders = [
-                "0_INBOX", "1_기본정보", "2_사건개요", "3_기준판례",
-                "4_사실관계", "5_관련법리", "6_논리구성", "7_제출증거",
+                "0_INBOX", "1_기본정보", "2_사건개요", "3_사실관계",
+                "4_기준판례", "5_관련법리", "6_논리구성", "7_제출증거",
                 "8_제출서면", "9_판결"
             ]
             for folder in required_folders:

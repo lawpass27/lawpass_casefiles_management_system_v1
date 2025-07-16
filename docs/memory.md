@@ -220,4 +220,60 @@
 
 ---
 
-_마지막 업데이트: 2025-04-30_
+## 2025-07-02: CLAUDE.md 작성 및 개발환경 설정
+
+**날짜**: 2025-07-02
+
+**완료된 작업**:
+- [x] 코드베이스 전체 분석 완료
+- [x] 5단계 파이프라인 시스템 아키텍처 파악
+- [x] config.yaml 구성 및 설정 체계 분석
+- [x] requirements.txt 의존성 파악
+- [x] 주요 스크립트 기능 분석 (run_lawpass_casefiles_management_system.py 등)
+- [x] CLAUDE.md 파일 작성 완료 (미래 Claude Code 인스턴스를 위한 가이드)
+- [x] uv를 사용한 가상환경 설정 완료 (.venv)
+- [x] audio_to_markdown.py 실행을 위한 라이브러리 설치:
+  - openai-whisper (음성-텍스트 변환)
+  - torch (PyTorch 2.7.1+cu126, CUDA 지원)
+  - psutil (시스템 정보 모니터링)
+  - mutagen (오디오 파일 메타데이터)
+
+**시스템 분석 결과**:
+- **아키텍처**: 5단계 순차 처리 파이프라인
+  1. Step 1: 사건 폴더 선택 (대화형)
+  2. Step 2: 표준 폴더 구조 생성
+  3. Step 3: 전자소송 파일 임포트
+  4. Step 4: 파일명 표준화
+  5. Step 5: PDF 텍스트 추출 및 마크다운 변환
+- **설정 시스템**: YAML 기반 포괄적 구성 관리
+- **텍스트 추출**: Google Cloud Vision API 기반 OCR
+- **백업 시스템**: 단계별 검증 및 롤백 지원
+
+**개발환경 정보**:
+- **플랫폼**: WSL2 (Linux 6.6.87.2-microsoft-standard-WSL2)
+- **Python**: 3.11.13
+- **패키지 관리**: uv (고속 Python 패키지 관리자)
+- **가상환경**: .venv (uv로 생성)
+- **CUDA 지원**: PyTorch 2.7.1+cu126 설치됨
+
+**발견된 문제점**:
+- FFmpeg가 시스템에 설치되어 있지 않음 (audio_to_markdown.py 실행 시 필요)
+- 일부 경로가 Windows 환경에 하드코딩되어 있음
+- 대용량 파일 다운로드로 인한 설치 시간 증가
+
+**다음 단계 계획**:
+- FFmpeg 설치 (sudo apt install ffmpeg)
+- audio_to_markdown.py 테스트 실행
+- 기존 구조화 계획과 현재 상태 재검토
+- 실제 사용 시나리오 테스트
+
+**기술 스택 현황**:
+- **코어**: Python, PyYAML, Rich (UI)
+- **텍스트 처리**: Google Cloud Vision API, pdf2image, Pillow
+- **오디오 처리**: OpenAI Whisper, PyTorch, mutagen
+- **시스템**: psutil, pathlib
+- **개발 도구**: uv, git
+
+---
+
+_마지막 업데이트: 2025-07-02_

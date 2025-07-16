@@ -11,6 +11,7 @@ import logging
 import argparse
 import datetime
 import concurrent.futures
+import platform
 from google.cloud import vision
 from PIL import Image
 import tempfile
@@ -36,6 +37,31 @@ except ImportError:
 DEBUG = os.environ.get('DEBUG', 'False').lower() in ('true', '1', 't')
 PARALLEL_PROCESSING = True  # 병렬 처리 사용 여부
 
+# 플랫폼 감지 함수
+def detect_platform():
+    """현재 플랫폼을 감지하여 플래그를 반환"""
+    system = platform.system()
+    is_wsl = 'microsoft' in platform.uname().release.lower() or 'WSL' in platform.uname().release
+    is_windows = system == "Windows"
+    is_mac = system == "Darwin"
+    is_linux = system == "Linux"
+    
+    return {
+        'SYSTEM': system,
+        'IS_WSL': is_wsl,
+        'IS_WINDOWS': is_windows,
+        'IS_MAC': is_mac,
+        'IS_LINUX': is_linux
+    }
+
+# 전역 플랫폼 변수 초기화
+_platform_info = detect_platform()
+SYSTEM = _platform_info['SYSTEM']
+IS_WSL = _platform_info['IS_WSL']
+IS_WINDOWS = _platform_info['IS_WINDOWS']
+IS_MAC = _platform_info['IS_MAC']
+IS_LINUX = _platform_info['IS_LINUX']
+
 # Rich 콘솔 객체 생성
 custom_theme = Theme({
     "info": "cyan",
@@ -50,6 +76,94 @@ custom_theme = Theme({
 })
 
 console = Console(theme=custom_theme) if RICH_AVAILABLE else None
+
+def get_default_credentials_path():
+    """
+    플랫폼에 따른 기본 자격 증명 파일 경로를 반환합니다.
+    """
+    # 함수 내에서 플랫폼 감지 (멀티프로세싱 환경에서 안전)
+    platform_info = detect_platform()
+    
+    if platform_info['IS_WINDOWS']:
+        # Windows: C:\Users\username\.config\pdf2text\credentials.json
+        home = os.path.expanduser("~")
+        return os.path.join(home, ".config", "pdf2text", "credentials.json")
+    elif platform_info['IS_WSL']:
+        # WSL: /mnt/c/Users/username/.config/pdf2text/credentials.json
+        # WSL에서는 Windows 홈 디렉토리를 사용
+        import pwd
+        username = pwd.getpwuid(os.getuid()).pw_name
+        return f"/mnt/c/Users/{username}/.config/pdf2text/credentials.json"
+    elif platform_info['IS_MAC'] or platform_info['IS_LINUX']:
+        # macOS/Linux: /home/username/.config/pdf2text/credentials.json
+        home = os.path.expanduser("~")
+        return os.path.join(home, ".config", "pdf2text", "credentials.json")
+    else:
+        return None
+
+def get_platform_specific_env_var(base_var_name):
+    """
+    플랫폼별 환경 변수를 찾습니다.
+    예: GOOGLE_CLOUD_CREDENTIALS_WSL, GOOGLE_CLOUD_CREDENTIALS_WINDOWS 등
+    """
+    # 먼저 기본 환경 변수 확인
+    value = os.environ.get(base_var_name, '')
+    if value:
+        return value
+    
+    # 함수 내에서 플랫폼 감지 (멀티프로세싱 환경에서 안전)
+    platform_info = detect_platform()
+    
+    # 플랫폼별 환경 변수 확인
+    if platform_info['IS_WSL']:
+        return os.environ.get(f"{base_var_name}_WSL", '')
+    elif platform_info['IS_WINDOWS']:
+        return os.environ.get(f"{base_var_name}_WINDOWS", '')
+    elif platform_info['IS_MAC']:
+        return os.environ.get(f"{base_var_name}_MAC", '')
+    elif platform_info['IS_LINUX']:
+        return os.environ.get(f"{base_var_name}_LINUX", '')
+    
+    return ''
+
+def get_cross_platform_path(windows_path):
+    """
+    Windows 경로를 현재 시스템에 맞는 경로로 변환합니다.
+    WSL 환경에서는 /mnt/d/ 형식으로, Windows에서는 그대로 사용합니다.
+    """
+    # 함수 내에서 플랫폼 감지 (멀티프로세싱 환경에서 안전)
+    platform_info = detect_platform()
+    
+    if platform_info['IS_LINUX'] and platform_info['IS_WSL']:
+        # WSL 환경에서 Windows 경로를 Linux 경로로 변환
+        import re
+        
+        # 드라이브 문자 패턴 매칭 (예: C:\, D:\\, C:\\\\, C:/)
+        # 백슬래시 뿐만 아니라 슬래시도 처리
+        match = re.match(r'^([A-Za-z]):[\\/]+(.*)$', windows_path)
+        if match:
+            drive_letter = match.group(1).lower()
+            rest_path = match.group(2)
+            # 백슬래시를 슬래시로 변환
+            rest_path = rest_path.replace('\\', '/')
+            # 연속된 슬래시를 하나로 변경
+            rest_path = re.sub(r'/+', '/', rest_path)
+            # 끝의 슬래시 제거
+            rest_path = rest_path.rstrip('/')
+            wsl_path = f"/mnt/{drive_letter}/{rest_path}"
+            
+            if DEBUG:
+                print(f"[DEBUG] Path conversion: '{windows_path}' -> '{wsl_path}'")
+            
+            return wsl_path
+        else:
+            # 드라이브 문자가 없는 경우 그대로 반환
+            if DEBUG:
+                print(f"[DEBUG] No drive letter found in path: '{windows_path}'")
+            return windows_path
+    else:
+        # Windows 또는 기타 환경: 그대로 사용
+        return windows_path
 
 # 로깅 설정
 def setup_logging(log_level="INFO", log_file=None):
@@ -95,17 +209,6 @@ load_dotenv()
 google_credentials = os.environ.get('GOOGLE_CLOUD_CREDENTIALS', '')
 poppler_path = os.environ.get('POPPLER_PATH', '')
 
-if RICH_AVAILABLE:
-    if google_credentials and os.path.exists(google_credentials):
-        console.print(f"[success]Google Cloud 인증 파일 확인: {google_credentials}[/]")
-    else:
-        console.print(f"[warning]Google Cloud 인증 파일을 찾을 수 없습니다: {google_credentials}[/]")
-    
-    if poppler_path and os.path.exists(poppler_path):
-        console.print(f"[success]Poppler 경로 확인: {poppler_path}[/]")
-    else:
-        console.print(f"[warning]Poppler 경로를 찾을 수 없습니다: {poppler_path}[/]")
-
 # PDF 파일을 이미지로 변환
 def pdf_to_images(pdf_path, poppler_path=None):
     """
@@ -118,7 +221,30 @@ def pdf_to_images(pdf_path, poppler_path=None):
     try:
         # 환경 변수에서 Poppler 경로 가져오기 (설정된 경우)
         if not poppler_path:
-            poppler_path = os.environ.get('POPPLER_PATH', '')
+            # 플랫폼별 환경 변수 확인
+            poppler_path = get_platform_specific_env_var('POPPLER_PATH')
+            
+            # 환경 변수에 없으면 config에서 가져오기
+            if not poppler_path:
+                try:
+                    # config.yaml 로드
+                    script_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+                    config_path = os.path.join(script_dir, 'config.yaml')
+                    with open(config_path, 'r', encoding='utf-8') as f:
+                        config = yaml.safe_load(f)
+                    poppler_path = config.get('text_extraction', {}).get('poppler_path', '')
+                    if poppler_path:
+                        poppler_path = get_cross_platform_path(poppler_path)
+                except:
+                    pass
+            
+            # 플랫폼별 처리
+            platform_info = detect_platform()
+            if platform_info['IS_WSL'] or platform_info['IS_LINUX'] or platform_info['IS_MAC']:
+                # Linux/WSL/macOS는 시스템 poppler 사용
+                poppler_path = None
+                if DEBUG:
+                    print(f"[DEBUG] {platform_info['SYSTEM']} detected, using system poppler")
         
         if RICH_AVAILABLE:
             console.print(f"[phase]PDF 파일을 이미지로 변환 중...[/] [filename]{os.path.basename(pdf_path)}[/]")
@@ -169,10 +295,49 @@ def detect_text_from_image(image, language_hints=None, credentials_path=None):
     if language_hints is None:
         language_hints = ['ko']
     
+    # 플랫폼 정보 디버그 출력
+    if DEBUG:
+        platform_info = detect_platform()
+        print(f"[DEBUG] Platform detection in detect_text_from_image:")
+        print(f"  - System: {platform_info['SYSTEM']}")
+        print(f"  - IS_WINDOWS: {platform_info['IS_WINDOWS']}")
+        print(f"  - IS_WSL: {platform_info['IS_WSL']}")
+    
     try:
         # 인증 파일 경로 설정
         if not credentials_path:
-            credentials_path = os.environ.get('GOOGLE_CLOUD_CREDENTIALS', '')
+            # 플랫폼별 환경 변수 확인
+            credentials_path = get_platform_specific_env_var('GOOGLE_CLOUD_CREDENTIALS')
+            
+            # 환경 변수에 없으면 config에서 가져오기
+            if not credentials_path:
+                try:
+                    # config.yaml 로드
+                    script_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+                    config_path = os.path.join(script_dir, 'config.yaml')
+                    with open(config_path, 'r', encoding='utf-8') as f:
+                        config = yaml.safe_load(f)
+                    original_path = config.get('text_extraction', {}).get('google_credentials_path', '')
+                    if original_path:
+                        # 항상 경로 변환 시도 (백슬래시가 없어도)
+                        credentials_path = get_cross_platform_path(original_path)
+                except Exception as e:
+                    if DEBUG:
+                        print(f"[DEBUG] Error loading config: {e}")
+                    pass
+            
+            # 그래도 없으면 기본 경로 사용
+            if not credentials_path:
+                default_path = get_default_credentials_path()
+                if DEBUG:
+                    print(f"[DEBUG] Default credentials path returned: {default_path}")
+                if default_path and os.path.exists(default_path):
+                    credentials_path = default_path
+                    if DEBUG:
+                        print(f"[DEBUG] Using default credentials path: {credentials_path}")
+                elif default_path:
+                    if DEBUG:
+                        print(f"[DEBUG] Default path does not exist: {default_path}")
         
         vision_api_available = False
         
@@ -188,7 +353,10 @@ def detect_text_from_image(image, language_hints=None, credentials_path=None):
                 vision_api_available = True
             else:
                 if RICH_AVAILABLE:
-                    console.print("[warning]Google Cloud 인증 파일을 찾을 수 없습니다. 텍스트 추출이 제한될 수 있습니다.[/]")
+                    if credentials_path:
+                        console.print(f"[warning]Google Cloud 인증 파일을 찾을 수 없습니다: {credentials_path}[/]")
+                    else:
+                        console.print("[warning]Google Cloud 인증 파일 경로가 설정되지 않았습니다.[/]")
                 logging.warning(f"Google Cloud 인증 파일을 찾을 수 없습니다: {credentials_path}")
                 return ""
             
@@ -475,11 +643,38 @@ def process_pdf_to_markdown(pdf_path, output_dir, config):
         
         # Google Cloud Vision API로 시도
         try:
-            # 환경 변수에서 인증 파일 경로 가져오기
-            credentials_path = os.environ.get('GOOGLE_CLOUD_CREDENTIALS', '')
+            # 플랫폼별 환경 변수에서 인증 파일 경로 가져오기
+            credentials_path = get_platform_specific_env_var('GOOGLE_CLOUD_CREDENTIALS')
+            if credentials_path:
+                # 환경 변수도 경로 변환 적용
+                credentials_path = get_cross_platform_path(credentials_path)
+            
+            # 환경 변수에 없으면 config에서 가져오기
+            if not credentials_path and config:
+                original_cred_path = config.get('text_extraction', {}).get('google_credentials_path', '')
+                if original_cred_path:
+                    credentials_path = get_cross_platform_path(original_cred_path)
+            
+            # 그래도 없으면 기본 경로 사용
+            if not credentials_path:
+                default_path = get_default_credentials_path()
+                if default_path and os.path.exists(default_path):
+                    credentials_path = default_path
             
             # Poppler 경로 설정
-            poppler_path = os.environ.get('POPPLER_PATH', '')
+            poppler_path = get_platform_specific_env_var('POPPLER_PATH')
+            
+            # 환경 변수에 없으면 config에서 가져오기
+            if not poppler_path and config:
+                poppler_path = config.get('text_extraction', {}).get('poppler_path', '')
+                if poppler_path:
+                    poppler_path = get_cross_platform_path(poppler_path)
+            
+            # 플랫폼별 처리
+            platform_info = detect_platform()
+            if platform_info['IS_WSL'] or platform_info['IS_LINUX'] or platform_info['IS_MAC']:
+                # Linux/WSL/macOS는 시스템 poppler 사용 (경로 불필요)
+                poppler_path = None
             
             # PDF를 이미지로 변환
             if RICH_AVAILABLE:
@@ -503,7 +698,9 @@ def process_pdf_to_markdown(pdf_path, output_dir, config):
                 image_data = [(img, i+1, len(images), language_hints, credentials_path, is_evidence) for i, img in enumerate(images)]
                 
                 # 병렬 처리 또는 순차 처리
-                if PARALLEL_PROCESSING and len(images) > 1:
+                # Windows에서는 플랫폼 감지 문제로 인해 항상 순차 처리
+                platform_info = detect_platform()
+                if PARALLEL_PROCESSING and len(images) > 1 and not platform_info['IS_WINDOWS']:
                     with concurrent.futures.ThreadPoolExecutor(max_workers=min(len(images), 4)) as executor:
                         results = list(executor.map(process_image_to_text, image_data))
                 else:
@@ -642,16 +839,21 @@ def extract_text_from_pdfs(case_folder, config, process_evidence=True):
     processed_count = 0
     errors = []
     
-    # 병렬 처리 실행
-    with concurrent.futures.ProcessPoolExecutor(max_workers=max_workers) as executor:
-        # PDF 처리 작업 제출
-        future_to_pdf = {executor.submit(process_pdf_to_markdown, pdf_path, output_dir, config): pdf_path for pdf_path in pdf_files}
-        
-        # 결과 수집
-        for future in concurrent.futures.as_completed(future_to_pdf):
-            pdf_path = future_to_pdf[future]
+    # Windows에서는 순차 처리, 그 외 환경에서는 병렬 처리
+    platform_info = detect_platform()
+    
+    if DEBUG:
+        print(f"[DEBUG] Platform detection in extract_text_from_pdfs:")
+        print(f"  - System: {platform_info['SYSTEM']}")
+        print(f"  - IS_WINDOWS: {platform_info['IS_WINDOWS']}")
+        print(f"  - IS_WSL: {platform_info['IS_WSL']}")
+        print(f"  - Using {'sequential' if platform_info['IS_WINDOWS'] else 'parallel'} processing")
+    
+    if platform_info['IS_WINDOWS']:
+        # Windows에서는 순차 처리 (병렬 처리 시 플랫폼 감지 문제 방지)
+        for pdf_path in pdf_files:
             try:
-                result = future.result()
+                result = process_pdf_to_markdown(pdf_path, output_dir, config)
                 if result:
                     processed_count += 1
                 else:
@@ -660,6 +862,25 @@ def extract_text_from_pdfs(case_folder, config, process_evidence=True):
                 error_msg = f"파일 처리 중 오류 발생: {pdf_path} - {str(e)}"
                 logging.error(error_msg)
                 errors.append(error_msg)
+    else:
+        # Linux/WSL/macOS에서는 병렬 처리
+        with concurrent.futures.ProcessPoolExecutor(max_workers=max_workers) as executor:
+            # PDF 처리 작업 제출
+            future_to_pdf = {executor.submit(process_pdf_to_markdown, pdf_path, output_dir, config): pdf_path for pdf_path in pdf_files}
+            
+            # 결과 수집
+            for future in concurrent.futures.as_completed(future_to_pdf):
+                pdf_path = future_to_pdf[future]
+                try:
+                    result = future.result()
+                    if result:
+                        processed_count += 1
+                    else:
+                        errors.append(f"파일 처리 실패: {pdf_path}")
+                except Exception as e:
+                    error_msg = f"파일 처리 중 오류 발생: {pdf_path} - {str(e)}"
+                    logging.error(error_msg)
+                    errors.append(error_msg)
     
     return processed_count, errors
 
@@ -676,7 +897,31 @@ def load_config(config_path):
 # 사건 폴더 경로 입력 받기
 def get_case_folder():
     """사용자에게 사건 폴더 경로 입력 받기"""
-    case_folder = input("사건 폴더 경로를 입력하세요: ")
+    # 먼저 case_path.txt 파일에서 경로 읽기 시도
+    case_path_file = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "case_path.txt")
+    
+    if os.path.exists(case_path_file):
+        try:
+            with open(case_path_file, "r", encoding="utf-8") as f:
+                saved_path = f.read().strip()
+                if saved_path:
+                    if RICH_AVAILABLE:
+                        console.print(f"\n[info]case_path.txt에 저장된 경로:[/] {saved_path}")
+                        use_saved = console.input("[question]이 경로를 사용하시겠습니까? (y/n) [기본값: y]: [/]").lower() or 'y'
+                    else:
+                        print(f"\ncase_path.txt에 저장된 경로: {saved_path}")
+                        use_saved = input("이 경로를 사용하시겠습니까? (y/n) [기본값: y]: ").lower() or 'y'
+                    
+                    if use_saved == 'y':
+                        return saved_path
+        except Exception as e:
+            logging.warning(f"case_path.txt 파일 읽기 오류: {e}")
+    
+    # 저장된 경로가 없거나 사용하지 않는 경우 새로 입력 받기
+    if RICH_AVAILABLE:
+        case_folder = console.input("[question]사건 폴더 경로를 입력하세요: [/]")
+    else:
+        case_folder = input("사건 폴더 경로를 입력하세요: ")
     
     # 경로에서 따옴표 제거
     case_folder = case_folder.strip('"\'')
@@ -836,16 +1081,16 @@ def main():
     log_level = "DEBUG" if args.debug else "INFO"
     
     # 설정 파일 로드
-    # 설정 파일 경로 결정
-    if args.config == 'config.yaml':  # 기본값인 경우 스크립트 위치 기준으로 경로 설정
-        script_dir = os.path.dirname(os.path.abspath(__file__))
-        config_path = os.path.join(script_dir, args.config)
-    else:  # 사용자가 경로를 지정한 경우 해당 경로 사용
-        config_path = args.config
+    script_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    config_path = os.path.join(script_dir, 'config.yaml')
     config = load_config(config_path)
     
     if not config:
-        print(f"오류: 설정 파일을 로드할 수 없습니다: {config_path}")
+        # Rich 사용 가능 여부에 따라 다른 출력
+        if RICH_AVAILABLE:
+            console.print(f"[error]오류: 설정 파일을 로드할 수 없습니다: {config_path}[/]")
+        else:
+            print(f"오류: 설정 파일을 로드할 수 없습니다: {config_path}")
         return 1
     
     # 병렬 처리 설정 업데이트
@@ -881,6 +1126,9 @@ def main():
     
     # 경로에서 따옴표 제거 및 정규화
     case_folder = case_folder.strip('"\'')
+    # Windows 경로를 크로스플랫폼 경로로 변환 (필요한 경우)
+    if case_folder and '\\' in case_folder:
+        case_folder = get_cross_platform_path(case_folder)
     case_folder = os.path.normpath(case_folder)
     
     if RICH_AVAILABLE:

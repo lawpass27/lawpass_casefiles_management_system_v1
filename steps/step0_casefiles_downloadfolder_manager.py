@@ -1,10 +1,70 @@
 import os
 import shutil
-import webbrowser
+import platform
+import subprocess
+
+def get_cross_platform_path(windows_path):
+    """
+    Windows 경로를 현재 시스템에 맞는 경로로 변환합니다.
+    WSL 환경에서는 /mnt/d/ 형식으로, Windows에서는 그대로 사용합니다.
+    """
+    system = platform.system()
+    
+    # WSL 환경 감지
+    is_wsl = 'microsoft' in platform.uname().release.lower() or 'WSL' in platform.uname().release
+    
+    if system == "Linux" and is_wsl:
+        # WSL 환경: D:\\ -> /mnt/d/
+        if windows_path.startswith("D:\\"):
+            return windows_path.replace("D:\\", "/mnt/d/").replace("\\", "/")
+        elif windows_path.startswith("C:\\"):
+            return windows_path.replace("C:\\", "/mnt/c/").replace("\\", "/")
+        else:
+            # 다른 드라이브의 경우 일반적인 패턴 적용
+            drive_letter = windows_path[0].lower()
+            return windows_path.replace(f"{windows_path[0]}:\\", f"/mnt/{drive_letter}/").replace("\\", "/")
+    else:
+        # Windows 또는 기타 환경: 그대로 사용
+        return windows_path
+
+def open_cross_platform_browser(url):
+    """
+    크로스플랫폼 방식으로 웹브라우저를 엽니다.
+    Windows, WSL, Linux, macOS를 지원합니다.
+    """
+    system = platform.system()
+    
+    # WSL 환경 감지
+    is_wsl = 'microsoft' in platform.uname().release.lower() or 'WSL' in platform.uname().release
+    
+    try:
+        if system == "Linux" and is_wsl:
+            # WSL 환경: wslview 사용
+            subprocess.run(['wslview', url], check=True)
+            return True
+        elif system == "Windows":
+            # Windows: 기본 브라우저 사용
+            os.startfile(url)
+            return True
+        elif system == "Darwin":
+            # macOS: open 명령어 사용
+            subprocess.run(['open', url], check=True)
+            return True
+        elif system == "Linux":
+            # 일반 Linux: xdg-open 사용
+            subprocess.run(['xdg-open', url], check=True)
+            return True
+        else:
+            # 기타 시스템: 지원하지 않음
+            print(f"지원하지 않는 시스템입니다: {system}")
+            return False
+    except Exception as e:
+        print(f"브라우저 열기 실패: {e}")
+        return False
 
 # 경로 설정
-source_folder = r"D:\전자소송다운로드"
-backup_base_folder = r"D:\전자소송다운로드 백업"
+source_folder = get_cross_platform_path(r"D:\전자소송다운로드")
+backup_base_folder = get_cross_platform_path(r"D:\전자소송다운로드_백업")
 temp_move_folder_name = "임시이동"
 target_folder = os.path.join(backup_base_folder, temp_move_folder_name)
 
@@ -47,22 +107,12 @@ def move_files_and_open_browser():
 
         # 2. 웹 브라우저 열기
         print(f"'{url_to_open}' 웹 페이지를 엽니다...")
-        # 특정 브라우저(크롬)를 지정하여 열기 시도
-        try:
-            # Windows에서 기본 브라우저가 아닌 크롬을 지정하는 방법
-            # 크롬 실행 파일 경로를 직접 지정해야 할 수 있음
-            # 일반적인 경로 예시: 'C:/Program Files/Google/Chrome/Application/chrome.exe %s'
-            # webbrowser.get('chrome').open(url_to_open) # 시스템에 'chrome'으로 등록된 경우
-            webbrowser.open(url_to_open) # 시스템 기본 브라우저 사용
+        
+        # 크로스플랫폼 웹브라우저 열기
+        if open_cross_platform_browser(url_to_open):
             print("웹 페이지를 열었습니다.")
-        except webbrowser.Error as e:
-            print(f"웹 브라우저를 여는 데 실패했습니다: {e}")
-            print("시스템 기본 브라우저로 다시 시도합니다.")
-            try:
-                webbrowser.open(url_to_open)
-                print("시스템 기본 브라우저로 웹 페이지를 열었습니다.")
-            except webbrowser.Error as e2:
-                 print(f"시스템 기본 브라우저로도 열 수 없습니다: {e2}")
+        else:
+            print("웹 브라우저를 열 수 없습니다.")
 
 
     except Exception as e:

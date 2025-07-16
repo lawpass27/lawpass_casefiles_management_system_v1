@@ -1,97 +1,185 @@
 import os
-import pyperclip
 import sys
+import platform
+import subprocess
 
-def get_subfolders_from_multiple_dirs(parent_dirs):
+def get_cross_platform_path(windows_path):
     """
-    여러 부모 디렉토리에서 모든 하위 폴더를 수집합니다.
-    각 하위 폴더에 대해 (부모 디렉토리, 하위 폴더 이름, 전체 경로)를 반환합니다.
+    Windows 경로를 현재 시스템에 맞는 경로로 변환합니다.
+    WSL 환경에서는 /mnt/d/ 형식으로, Windows에서는 그대로 사용합니다.
     """
-    all_subfolders = []
+    system = platform.system()
+    
+    # WSL 환경 감지
+    is_wsl = 'microsoft' in platform.uname().release.lower() or 'WSL' in platform.uname().release
+    
+    if system == "Linux" and is_wsl:
+        # WSL 환경: D:\\ -> /mnt/d/
+        if windows_path.startswith("D:\\"):
+            return windows_path.replace("D:\\", "/mnt/d/").replace("\\", "/")
+        elif windows_path.startswith("C:\\"):
+            return windows_path.replace("C:\\", "/mnt/c/").replace("\\", "/")
+        else:
+            # 다른 드라이브의 경우 일반적인 패턴 적용
+            drive_letter = windows_path[0].lower()
+            return windows_path.replace(f"{windows_path[0]}:\\", f"/mnt/{drive_letter}/").replace("\\", "/")
+    else:
+        # Windows 또는 기타 환경: 그대로 사용
+        return windows_path
 
-    for parent_dir in parent_dirs:
-        # 디렉토리가 존재하는지 확인
-        if not os.path.isdir(parent_dir):
-            print(f"경고: 디렉토리를 찾을 수 없습니다 - {parent_dir}")
-            continue
+# 설정
+VAULT_PATH = get_cross_platform_path("D:\\GoogleDriveLaptop\\LifewithAI-20250120")
+
+# 법률 폴더 목록
+LEGAL_FOLDERS = [
+    '1100_Legaladvises',
+    '1200_Legalcases',
+    '1300_Legalcases_(주)대구농산',
+    '1400_Legalcases_(주)리하온'
+]
+
+def get_legal_cases():
+    """모든 법률 사건 폴더 목록을 가져옵니다."""
+    all_case_folders = []
+
+    for legal_folder in LEGAL_FOLDERS:
+        legal_folder_path = os.path.join(VAULT_PATH, legal_folder)
 
         try:
-            # 하위 항목 중 디렉토리만 필터링
-            subdirs = [d for d in os.listdir(parent_dir) if os.path.isdir(os.path.join(parent_dir, d))]
+            if os.path.exists(legal_folder_path):
+                entries = [entry for entry in os.listdir(legal_folder_path)
+                          if os.path.isdir(os.path.join(legal_folder_path, entry))]
 
-            # 각 하위 폴더에 대한 정보 저장
-            for subdir in subdirs:
-                full_path = os.path.join(parent_dir, subdir)
-                # 부모 디렉토리 이름 추출 (마지막 폴더 이름만)
-                parent_name = os.path.basename(parent_dir)
-                all_subfolders.append((parent_name, subdir, full_path))
+                # _INBOX 폴더 제외 (대소문자 구분 없이)
+                case_folders = [
+                    {
+                        "name": entry,
+                        "path": os.path.join(legal_folder, entry),
+                        "parentFolder": legal_folder
+                    }
+                    for entry in entries
+                    if "_inbox" not in entry.lower()  # 대소문자 구분 없이 _inbox가 포함되지 않은 항목만 포함
+                ]
 
+                all_case_folders.extend(case_folders)
         except Exception as e:
-            print(f"경고: '{parent_dir}' 디렉토리 처리 중 오류 발생: {e}")
+            print(f"폴더 접근 오류: {legal_folder_path} - {str(e)}")
 
-    # 하위 폴더 이름으로 정렬
-    all_subfolders.sort(key=lambda x: x[1])
-    return all_subfolders
+    # 결과 정렬 (부모 폴더별로 그룹화)
+    all_case_folders.sort(key=lambda x: (x["parentFolder"], x["name"]))
 
-def list_and_copy_folder_path(parent_dirs):
+    return all_case_folders
+
+def list_and_copy_folder_path(parent_dirs=None):
     """
-    여러 부모 디렉토리의 하위 폴더 목록을 보여주고, 사용자가 선택한 폴더의
+    사건 폴더 목록을 보여주고, 사용자가 선택한 폴더의
     전체 경로를 클립보드에 복사하고 case_path.txt 파일에 저장합니다.
     """
     try:
-        # 여러 부모 디렉토리에서 모든 하위 폴더 수집
-        all_subfolders = get_subfolders_from_multiple_dirs(parent_dirs)
+        # 사건 폴더 목록 가져오기
+        legal_cases = get_legal_cases()
 
-        if not all_subfolders:
-            print("지정된 디렉토리에 하위 폴더가 없습니다.")
+        if not legal_cases:
+            print("지정된 디렉토리에 사건 폴더가 없습니다.")
             return # 함수 종료
 
-        print("------------------------------------")
-        print("사건 폴더 목록:")
-        print("------------------------------------")
-        for i, (parent_name, dirname, _) in enumerate(all_subfolders):
-            print(f"{i + 1: >3}. [{parent_name}] {dirname}") # 부모 디렉토리 정보 포함
+        print("=====================================")
+        print("법률 사건 목록")
+        print("=====================================")
+        
+        # 사건 폴더 목록 출력
+        print(f"\n{len(legal_cases)}개의 법률 사건 폴더를 찾았습니다:")
+        
+        # 부모 폴더별로 그룹화하여 출력
+        current_parent = ""
+        for i, case_folder in enumerate(legal_cases):
+            if current_parent != case_folder["parentFolder"]:
+                current_parent = case_folder["parentFolder"]
+                print(f"\n[{current_parent}]")
+            # 한 자리 수일 경우 앞에 0을 붙여 두 자리로 표시
+            index_str = f"{i + 1:02d}"
+            print(f"{index_str}. {case_folder['name']}")
         print("------------------------------------")
 
-        while True:
-            try:
-                choice = input(f"클립보드에 복사할 폴더 번호 (1-{len(all_subfolders)}) 또는 취소(c)를 입력하세요: ")
-                if choice.lower() == 'c':
-                    print("작업을 취소했습니다.")
-                    return # 함수 종료
+        # 사용자 입력 받기
+        answer = input("\n클립보드에 복사할 사건 폴더의 번호 또는 경로를 입력하세요: ")
 
-                choice_num = int(choice)
-                if 1 <= choice_num <= len(all_subfolders):
-                    parent_name, subdir_name, full_path = all_subfolders[choice_num - 1]
-                    print(f"\n선택: [{parent_name}] {subdir_name}")
+        case_path = ""
+        full_path = ""
 
-                    # pyperclip 예외 처리 추가
+        # 번호로 입력한 경우
+        if answer.isdigit():
+            index = int(answer) - 1
+            if 0 <= index < len(legal_cases):
+                case_folder = legal_cases[index]
+                case_path = case_folder["path"]
+                full_path = os.path.join(VAULT_PATH, case_path)
+                print(f"\n선택: [{case_folder['parentFolder']}] {case_folder['name']}")
+            else:
+                print("잘못된 번호입니다.")
+                return
+        # 경로로 입력한 경우
+        else:
+            case_path = answer
+            full_path = os.path.join(VAULT_PATH, case_path)
+            
+            # 경로가 존재하는지 확인
+            if not os.path.exists(full_path):
+                print(f"경로를 찾을 수 없습니다: {full_path}")
+                return
+
+        # 크로스플랫폼 클립보드 복사
+        clipboard_success = False
+        
+        system = platform.system()
+        is_wsl = 'microsoft' in platform.uname().release.lower() or 'WSL' in platform.uname().release
+        
+        try:
+            if system == "Linux" and is_wsl:
+                # WSL 환경: clip.exe 사용
+                subprocess.run(['clip.exe'], input=full_path.encode('utf-8'), check=True)
+                clipboard_success = True
+            elif system == "Windows":
+                # Windows: clip 명령어 사용
+                subprocess.run(['clip'], input=full_path.encode('utf-8'), check=True)
+                clipboard_success = True
+            elif system == "Darwin":
+                # macOS: pbcopy 사용
+                subprocess.run(['pbcopy'], input=full_path.encode('utf-8'), check=True)
+                clipboard_success = True
+            elif system == "Linux":
+                # Linux: xclip 시도 (설치되어 있는 경우)
+                try:
+                    subprocess.run(['xclip', '-selection', 'clipboard'], input=full_path.encode('utf-8'), check=True)
+                    clipboard_success = True
+                except (subprocess.CalledProcessError, FileNotFoundError):
+                    # xclip이 없으면 xsel 시도
                     try:
-                        pyperclip.copy(full_path)
-                        print(f"\n✅ 성공: '{full_path}' 경로가 클립보드에 복사되었습니다.")
-                    except pyperclip.PyperclipException as clip_err:
-                        print(f"\n❌ 오류: 클립보드 복사 중 문제가 발생했습니다. 에러: {clip_err}")
-                        print("수동으로 경로를 복사하세요:")
-                        print(full_path)
+                        subprocess.run(['xsel', '--clipboard', '--input'], input=full_path.encode('utf-8'), check=True)
+                        clipboard_success = True
+                    except (subprocess.CalledProcessError, FileNotFoundError):
+                        pass
+            
+            if clipboard_success:
+                print(f"\n✅ 성공: {full_path} 경로가 클립보드에 복사되었습니다.")
+            else:
+                print(f"\n⚠️  경고: 클립보드 복사가 지원되지 않는 환경입니다.")
+                print("수동으로 경로를 복사하세요:")
+                print(full_path)
+                
+        except Exception as e:
+            print(f"\n❌ 오류: 클립보드 복사 중 문제가 발생했습니다. 에러: {e}")
+            print("수동으로 경로를 복사하세요:")
+            print(full_path)
 
-                    # 파일에 경로 저장
-                    try:
-                        with open("case_path.txt", "w", encoding="utf-8") as f:
-                            f.write(full_path)
-                        print(f"✅ 성공: '{full_path}' 경로가 case_path.txt 파일에 저장되었습니다.")
-                    except Exception as save_err:
-                        print(f"❌ 오류: 경로를 파일에 저장하는 중 문제가 발생했습니다. 에러: {save_err}")
-                        print("프로그램이 계속 진행되지만, 다음 단계에서 문제가 발생할 수 있습니다.")
-
-                    break # 성공적으로 복사 후 루프 종료
-                else:
-                    print(f"❌ 잘못된 번호입니다. 1부터 {len(all_subfolders)} 사이의 번호를 입력하거나 'c'를 입력하세요.")
-            except ValueError:
-                print("❌ 잘못된 입력입니다. 숫자 또는 'c'를 입력하세요.")
-            # 예상치 못한 오류 처리 추가
-            except Exception as e:
-                print(f"\n❌ 예상치 못한 오류 발생: {e}")
-                sys.exit(1) # 심각한 오류 시 종료
+        # 파일에 경로 저장
+        try:
+            with open("case_path.txt", "w", encoding="utf-8") as f:
+                f.write(full_path)
+            print(f"✅ 성공: {full_path} 경로가 case_path.txt 파일에 저장되었습니다.")
+        except Exception as save_err:
+            print(f"❌ 오류: 경로를 파일에 저장하는 중 문제가 발생했습니다. 에러: {save_err}")
+            print("프로그램이 계속 진행되지만, 다음 단계에서 문제가 발생할 수 있습니다.")
 
     except FileNotFoundError:
         # 이 오류는 isdir() 체크로 인해 발생 가능성이 낮지만, 방어적으로 추가
@@ -106,15 +194,14 @@ def list_and_copy_folder_path(parent_dirs):
 
 
 if __name__ == "__main__":
-    # 여러 대상 디렉토리 경로 설정 (Raw string 사용)
-    case_folder_paths = [
-        r"F:\내 드라이브\LifewithAI-20250120\Legalcases",
-        r"F:\내 드라이브\LifewithAI-20250120\Legalcases_(주)리하온",
-        r"F:\내 드라이브\LifewithAI-20250120\Legalcases_(주)대구농산"
-    ]
-    list_and_copy_folder_path(case_folder_paths)
+    try:
+        list_and_copy_folder_path()
+    except KeyboardInterrupt:
+        print("\n프로그램이 사용자에 의해 중단되었습니다.")
+    except Exception as e:
+        print(f"프로그램 실행 중 오류 발생: {str(e)}")
+    finally:
+        # 사용자가 결과를 확인하고 종료할 수 있도록 input() 유지
+        print("\n------------------------------------")
+        input("엔터 키를 누르면 프로그램을 종료합니다...")
 
-    # 사용자가 결과를 확인하고 종료할 수 있도록 input() 유지
-    # 단, 오류 발생 시에는 sys.exit()로 즉시 종료되므로 이 부분은 실행되지 않음
-    print("\n------------------------------------")
-    input("엔터 키를 누르면 프로그램을 종료합니다...")

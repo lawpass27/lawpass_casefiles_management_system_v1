@@ -8,7 +8,32 @@ import time
 import shutil
 import argparse
 import yaml
+import platform
 from datetime import datetime
+
+def get_cross_platform_path(windows_path):
+    """
+    Windows 경로를 현재 시스템에 맞는 경로로 변환합니다.
+    WSL 환경에서는 /mnt/d/ 형식으로, Windows에서는 그대로 사용합니다.
+    """
+    system = platform.system()
+    
+    # WSL 환경 감지
+    is_wsl = 'microsoft' in platform.uname().release.lower() or 'WSL' in platform.uname().release
+    
+    if system == "Linux" and is_wsl:
+        # WSL 환경: D:\\ -> /mnt/d/
+        if windows_path.startswith("D:\\"):
+            return windows_path.replace("D:\\", "/mnt/d/").replace("\\", "/")
+        elif windows_path.startswith("C:\\"):
+            return windows_path.replace("C:\\", "/mnt/c/").replace("\\", "/")
+        else:
+            # 다른 드라이브의 경우 일반적인 패턴 적용
+            drive_letter = windows_path[0].lower()
+            return windows_path.replace(f"{windows_path[0]}:\\", f"/mnt/{drive_letter}/").replace("\\", "/")
+    else:
+        # Windows 또는 기타 환경: 그대로 사용
+        return windows_path
 
 def get_timestamp():
     """타임스탬프 생성"""
@@ -158,6 +183,19 @@ def copy_and_backup_files(source_folder, case_folder, backup_folder, original_fo
 
 def get_case_folder():
     """사용자에게 사건 폴더 경로 입력 받기"""
+    # 먼저 case_path.txt 파일에서 경로 읽기 시도
+    if os.path.exists("case_path.txt"):
+        try:
+            with open("case_path.txt", "r", encoding="utf-8") as f:
+                saved_path = f.read().strip()
+                if saved_path:
+                    use_saved = input(f"\ncase_path.txt에 저장된 경로: {saved_path}\n이 경로를 사용하시겠습니까? (y/n, 기본값: y): ").lower() or 'y'
+                    if use_saved == 'y':
+                        return saved_path
+        except Exception as e:
+            print(f"case_path.txt 파일 읽기 오류: {e}")
+    
+    # 저장된 경로가 없거나 사용하지 않는 경우 새로 입력 받기
     case_folder = input("사건 폴더 경로를 입력하세요: ")
     # 따옴표 제거
     case_folder = case_folder.strip('"\'')
@@ -175,7 +213,8 @@ def main():
     args = parser.parse_args()
     
     # 설정 파일 경로
-    config_path = args.config or os.path.join(os.path.dirname(os.path.abspath(__file__)), 'config.yaml')
+    script_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    config_path = args.config or os.path.join(script_dir, 'config.yaml')
     
     # 설정 파일 로드
     if os.path.exists(config_path):
@@ -186,15 +225,21 @@ def main():
             # 설정 파일에서 값 가져오기
             source_folder = args.source or config.get('general', {}).get('source_folder', 'D:\\전자소송다운로드')
             case_folder = args.case_folder or config.get('general', {}).get('case_folder', '')
-            backup_folder = args.backup or config.get('general', {}).get('backup_folder', 'D:\\전자소송다운로드 백업')
+            backup_folder = args.backup or config.get('general', {}).get('backup_folder', 'D:\\전자소송다운로드_백업')
             original_folder_name = args.original_folder or config.get('file_management', {}).get('original_folder_name', '원본폴더')
+            
+            # Windows 경로를 크로스플랫폼 경로로 변환
+            if source_folder and '\\' in source_folder:
+                source_folder = get_cross_platform_path(source_folder)
+            if backup_folder and '\\' in backup_folder:
+                backup_folder = get_cross_platform_path(backup_folder)
         except Exception as e:
             print(f"설정 파일 로드 실패: {e}")
             return 1
     else:
-        source_folder = args.source or 'D:\\전자소송다운로드'
+        source_folder = args.source or get_cross_platform_path('D:\\전자소송다운로드')
         case_folder = args.case_folder
-        backup_folder = args.backup or 'D:\\전자소송다운로드 백업'
+        backup_folder = args.backup or get_cross_platform_path('D:\\전자소송다운로드_백업')
         original_folder_name = args.original_folder or '원본폴더'
     
     # 필수 인자 확인
@@ -210,6 +255,10 @@ def main():
         if not case_folder:
             print("사건 폴더 경로를 지정해야 합니다.")
             return 1
+    
+    # Windows 경로를 크로스플랫폼 경로로 변환 (필요한 경우)
+    if case_folder and '\\' in case_folder:
+        case_folder = get_cross_platform_path(case_folder)
     
     # 경로 정규화
     source_folder = os.path.normpath(source_folder)

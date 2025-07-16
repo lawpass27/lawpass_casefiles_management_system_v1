@@ -164,7 +164,8 @@ def load_config(config_path):
 def create_default_config():
     """기본 설정값 생성"""
     # 환경 변수에서 기본값 가져오기 시도
-    google_creds_from_env = os.environ.get('GOOGLE_CLOUD_CREDENTIALS', '')
+    # 두 환경 변수 모두 확인 (GOOGLE_CLOUD_CREDENTIALS가 우선)
+    google_creds_from_env = os.environ.get('GOOGLE_CLOUD_CREDENTIALS', '') or os.environ.get('GOOGLE_APPLICATION_CREDENTIALS', '')
     poppler_from_env = os.environ.get('POPPLER_PATH', '')
 
     return {
@@ -243,16 +244,17 @@ def detect_text_from_image(image_data):
             raise FileNotFoundError(f"Google Cloud 인증 파일을 찾을 수 없습니다: {credentials_path}")
 
         # 각 스레드/프로세스에서 환경 변수 설정이 필요할 수 있음
-        # os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = credentials_path
-        # => Client 생성 시 credentials_path 직접 사용하는 것이 더 안정적일 수 있음
+        # 환경 변수 이름을 .env 파일과 일치하도록 설정
+        # 두 환경 변수 모두 설정 (호환성 유지)
+        os.environ['GOOGLE_CLOUD_CREDENTIALS'] = credentials_path
+        os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = credentials_path  # Google Cloud API에서 사용하는 표준 환경 변수
+        
         client_options = {}
         if credentials_path:
              client_options['credentials_path'] = credentials_path
 
         # client = vision.ImageAnnotatorClient(**client_options) # options 사용 불가 -> 직접 설정 필요
-        # 스레드 안전성을 위해 각 작업마다 client를 생성하거나, client 객체 자체를 인수로 전달해야 함.
-        # 여기서는 환경 변수를 사용한 기존 방식 유지 (호출 전에 설정되었다고 가정)
-        os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = credentials_path
+        # 스레드 안전성을 위해 각 작업마다 client를 생성
         client = vision.ImageAnnotatorClient()
 
 

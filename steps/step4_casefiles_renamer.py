@@ -9,6 +9,7 @@ import argparse
 import logging
 from datetime import datetime
 import yaml
+import platform
 
 # Rich 라이브러리 추가
 try:
@@ -37,6 +38,30 @@ custom_theme = Theme({
 })
 
 console = Console(theme=custom_theme) if RICH_AVAILABLE else None
+
+def get_cross_platform_path(windows_path):
+    """
+    Windows 경로를 현재 시스템에 맞는 경로로 변환합니다.
+    WSL 환경에서는 /mnt/d/ 형식으로, Windows에서는 그대로 사용합니다.
+    """
+    system = platform.system()
+    
+    # WSL 환경 감지
+    is_wsl = 'microsoft' in platform.uname().release.lower() or 'WSL' in platform.uname().release
+    
+    if system == "Linux" and is_wsl:
+        # WSL 환경: D:\\ -> /mnt/d/
+        if windows_path.startswith("D:\\"):
+            return windows_path.replace("D:\\", "/mnt/d/").replace("\\", "/")
+        elif windows_path.startswith("C:\\"):
+            return windows_path.replace("C:\\", "/mnt/c/").replace("\\", "/")
+        else:
+            # 다른 드라이브의 경우 일반적인 패턴 적용
+            drive_letter = windows_path[0].lower()
+            return windows_path.replace(f"{windows_path[0]}:\\", f"/mnt/{drive_letter}/").replace("\\", "/")
+    else:
+        # Windows 또는 기타 환경: 그대로 사용
+        return windows_path
 
 # 로깅 설정 함수
 def setup_logging(level="INFO", log_file=None):
@@ -91,6 +116,19 @@ def load_config(config_path):
 # 사건 폴더 경로 입력 받기
 def get_case_folder():
     """사용자에게 사건 폴더 경로 입력 받기"""
+    # 먼저 case_path.txt 파일에서 경로 읽기 시도
+    if os.path.exists("case_path.txt"):
+        try:
+            with open("case_path.txt", "r", encoding="utf-8") as f:
+                saved_path = f.read().strip()
+                if saved_path:
+                    use_saved = input(f"\ncase_path.txt에 저장된 경로: {saved_path}\n이 경로를 사용하시겠습니까? (y/n, 기본값: y): ").lower() or 'y'
+                    if use_saved == 'y':
+                        return saved_path
+        except Exception as e:
+            logging.warning(f"case_path.txt 파일 읽기 오류: {e}")
+    
+    # 저장된 경로가 없거나 사용하지 않는 경우 새로 입력 받기
     case_folder = input("사건 폴더 경로를 입력하세요: ")
     # 따옴표 제거
     case_folder = case_folder.strip('"\'')
@@ -1166,7 +1204,8 @@ def main():
     args = parser.parse_args()
     
     # 설정 파일 경로
-    config_path = args.config or os.path.join(os.path.dirname(os.path.abspath(__file__)), 'config.yaml')
+    script_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    config_path = os.path.join(script_dir, 'config.yaml')  
     
     # 설정 파일 로드
     config = None
@@ -1220,6 +1259,10 @@ def main():
     
     # 따옴표 제거 및 경로 정규화
     case_folder = os.path.normpath(case_folder.strip('"\'') if isinstance(case_folder, str) else case_folder)
+    
+    # Windows 경로를 크로스플랫폼 경로로 변환 (필요한 경우)
+    if case_folder and '\\' in case_folder:
+        case_folder = get_cross_platform_path(case_folder)
     
     # 1차 파일 이름 변경 실행
     try:

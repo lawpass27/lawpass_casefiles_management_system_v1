@@ -7,6 +7,7 @@ import os
 import sys
 import argparse
 import logging
+import platform
 
 # --- Optional Rich Integration ---
 try:
@@ -30,18 +31,44 @@ except ImportError:
     print("Rich 설치 방법: pip install rich")
 # --- End Optional Rich Integration ---
 
+def get_cross_platform_path(windows_path):
+    """
+    Windows 경로를 현재 시스템에 맞는 경로로 변환합니다.
+    WSL 환경에서는 /mnt/d/ 형식으로, Windows에서는 그대로 사용합니다.
+    """
+    system = platform.system()
+    
+    # WSL 환경 감지
+    is_wsl = 'microsoft' in platform.uname().release.lower() or 'WSL' in platform.uname().release
+    
+    if system == "Linux" and is_wsl:
+        # WSL 환경: D:\\ -> /mnt/d/
+        if windows_path.startswith("D:\\"):
+            return windows_path.replace("D:\\", "/mnt/d/").replace("\\", "/")
+        elif windows_path.startswith("C:\\"):
+            return windows_path.replace("C:\\", "/mnt/c/").replace("\\", "/")
+        else:
+            # 다른 드라이브의 경우 일반적인 패턴 적용
+            drive_letter = windows_path[0].lower()
+            return windows_path.replace(f"{windows_path[0]}:\\", f"/mnt/{drive_letter}/").replace("\\", "/")
+    else:
+        # Windows 또는 기타 환경: 그대로 사용
+        return windows_path
+
 # 생성할 표준 폴더 목록
 REQUIRED_FOLDERS = [
     "0_INBOX",  
     "1_기본정보",
     "2_사건개요",
-    "3_기준판례",
-    "4_사실관계",
+    "3_사실관계",
+    "4_기준판례",
     "5_관련법리",
     "6_논리구성",
     "7_제출증거",
     "8_제출서면",
-    "9_판결"
+    "9_판결",
+    "원본폴더",
+    "절차관련"
 ]
 
 # 로깅 설정 함수
@@ -84,6 +111,24 @@ def print_message(message, level="info"):
 
 def get_case_folder_from_input():
     """사용자로부터 사건 폴더 경로 입력 받기"""
+    # 먼저 case_path.txt 파일에서 경로 읽기 시도
+    if os.path.exists("case_path.txt"):
+        try:
+            with open("case_path.txt", "r", encoding="utf-8") as f:
+                saved_path = f.read().strip()
+                if saved_path:
+                    prompt = f"\ncase_path.txt에 저장된 경로: {saved_path}\n이 경로를 사용하시겠습니까? (y/n, 기본값: y): "
+                    if RICH_AVAILABLE:
+                        use_saved = console.input(f"[question]{prompt}[/]").lower() or 'y'
+                    else:
+                        use_saved = input(prompt).lower() or 'y'
+                    
+                    if use_saved == 'y':
+                        return saved_path
+        except Exception as e:
+            logging.warning(f"case_path.txt 파일 읽기 오류: {e}")
+    
+    # 저장된 경로가 없거나 사용하지 않는 경우 새로 입력 받기
     prompt = "생성할 폴더의 상위 '사건 폴더' 경로를 입력하세요: "
     if RICH_AVAILABLE:
         # *** 수정된 부분: 직접 마크업 사용 ***
@@ -187,6 +232,11 @@ def main():
     case_folder_path = args.case_folder
     if not case_folder_path:
         case_folder_path = get_case_folder_from_input()
+    
+    # Windows 경로를 크로스플랫폼 경로로 변환 (필요한 경우)
+    if case_folder_path and '\\' in case_folder_path:
+        # Windows 형식 경로인 경우 변환
+        case_folder_path = get_cross_platform_path(case_folder_path)
 
     if not case_folder_path:
          print_message("오류: 사건 폴더 경로가 지정되지 않았습니다. 스크립트를 종료합니다.", "error")

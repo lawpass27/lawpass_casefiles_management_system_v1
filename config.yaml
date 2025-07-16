@@ -2,7 +2,7 @@
 general:
   source_folder: "D:\\전자소송다운로드"  # 전자소송 다운로드 폴더 경로
   case_folder: ""  # 사건 폴더 경로
-  backup_folder: "D:\\전자소송다운로드 백업"  # 백업 폴더 경로
+  backup_folder: "D:\\전자소송다운로드_백업"  # 백업 폴더 경로
 
 # 파일 관리 설정
 file_management:
@@ -76,8 +76,8 @@ text_extraction:
     - "en"
   ocr_dpi: 300  # OCR 이미지 해상도 (정확도 향상을 위해 300 이상 권장)
   # --- 확인된 실제 경로로 수정 ---
-  poppler_path: "C:/Program Files/poppler-24.07.0/Library/bin" # Poppler 경로 (PDF를 이미지로 변환하는 데 필요)
-  google_credentials_path: "C:/Users/lawpa/.config/pdf2text/credentials.json"  # Google Cloud Vision API 인증 정보 경로
+  poppler_path: "C:\\Users\\lawpass\\scoop\\apps\\poppler\\current\\bin" # Poppler 경로 (PDF를 이미지로 변환하는 데 필요)
+  google_credentials_path: "C:\\Users\\lawpass\\.config\\pdf2text\\credentials.json"  # Google Cloud Vision API 인증 정보 경로
   
   # 텍스트 추출 실패 시 대체 방법 설정
   fallback_methods:
