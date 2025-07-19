@@ -1,8 +1,28 @@
 # 기본 설정
 general:
+  # 플랫폼별 경로 설정 (Windows 경로 기준, 런타임에 자동 변환)
   source_folder: "D:\\전자소송다운로드"  # 전자소송 다운로드 폴더 경로
   case_folder: ""  # 사건 폴더 경로
   backup_folder: "D:\\전자소송다운로드_백업"  # 백업 폴더 경로
+  
+  # 플랫폼별 기본 경로 설정 (선택사항)
+  platform_specific:
+    windows:
+      source_folder: "D:\\전자소송다운로드"
+      backup_folder: "D:\\전자소송다운로드_백업"
+      documents_folder: "{user_documents}\\LawPass"  # {user_documents}는 런타임에 치환
+    wsl:
+      source_folder: "/mnt/d/전자소송다운로드"
+      backup_folder: "/mnt/d/전자소송다운로드_백업"
+      documents_folder: "/mnt/c/Users/{username}/Documents/LawPass"
+    macos:
+      source_folder: "~/Documents/전자소송다운로드"
+      backup_folder: "~/Documents/전자소송다운로드_백업"
+      documents_folder: "~/Documents/LawPass"
+    linux:
+      source_folder: "~/Documents/전자소송다운로드"
+      backup_folder: "~/Documents/전자소송다운로드_백업"
+      documents_folder: "~/Documents/LawPass"
 
 # 파일 관리 설정
 file_management:
@@ -75,9 +95,29 @@ text_extraction:
     - "ko"
     - "en"
   ocr_dpi: 300  # OCR 이미지 해상도 (정확도 향상을 위해 300 이상 권장)
-  # --- 확인된 실제 경로로 수정 ---
+  
+  # 플랫폼별 도구 경로 설정 (Windows 경로 기준, 런타임에 자동 변환)
   poppler_path: "C:\\Users\\lawpass\\scoop\\apps\\poppler\\current\\bin" # Poppler 경로 (PDF를 이미지로 변환하는 데 필요)
   google_credentials_path: "C:\\Users\\lawpass\\.config\\pdf2text\\credentials.json"  # Google Cloud Vision API 인증 정보 경로
+  
+  # 플랫폼별 도구 경로 설정 (선택사항)
+  platform_tools:
+    windows:
+      poppler_path: "C:\\Users\\{username}\\scoop\\apps\\poppler\\current\\bin"
+      google_credentials_path: "C:\\Users\\{username}\\.config\\pdf2text\\credentials.json"
+      tesseract_path: "C:\\Program Files\\Tesseract-OCR\\tesseract.exe"
+    wsl:
+      poppler_path: ""  # 시스템 패키지 사용 (경로 불필요)
+      google_credentials_path: "/mnt/c/Users/{username}/.config/pdf2text/credentials.json"
+      tesseract_path: "/usr/bin/tesseract"  # 시스템 패키지
+    macos:
+      poppler_path: "/usr/local/bin"  # Homebrew 기본 경로
+      google_credentials_path: "~/.config/pdf2text/credentials.json"
+      tesseract_path: "/usr/local/bin/tesseract"  # Homebrew
+    linux:
+      poppler_path: ""  # 시스템 패키지 사용
+      google_credentials_path: "~/.config/pdf2text/credentials.json"
+      tesseract_path: "/usr/bin/tesseract"
   
   # 텍스트 추출 실패 시 대체 방법 설정
   fallback_methods:

@@ -16,7 +16,17 @@ from .platform_utils import (
     open_url
 )
 
+from .config_manager import (
+    ConfigManager,
+    get_config_manager,
+    get_path,
+    get_setting,
+    get_all_paths,
+    validate_config_paths
+)
+
 __all__ = [
+    # Platform utilities
     'PlatformManager',
     'PlatformInfo', 
     'PathManager',
@@ -27,5 +37,13 @@ __all__ = [
     'convert_path',
     'get_env_var',
     'copy_to_clipboard',
-    'open_url'
+    'open_url',
+    
+    # Config management
+    'ConfigManager',
+    'get_config_manager',
+    'get_path',
+    'get_setting',
+    'get_all_paths',
+    'validate_config_paths'
 ]
