@@ -1,34 +1,36 @@
 import os
 import sys
-import platform
-import subprocess
 
-def get_cross_platform_path(windows_path):
-    """
-    Windows 경로를 현재 시스템에 맞는 경로로 변환합니다.
-    WSL 환경에서는 /mnt/d/ 형식으로, Windows에서는 그대로 사용합니다.
-    """
-    system = platform.system()
+# 통합 플랫폼 유틸리티 사용
+try:
+    from utils.platform_utils import get_platform_manager, convert_path
+    platform_manager = get_platform_manager()
+except ImportError:
+    # 기존 방식 fallback (호환성)
+    import platform
+    import subprocess
     
-    # WSL 환경 감지
-    is_wsl = 'microsoft' in platform.uname().release.lower() or 'WSL' in platform.uname().release
-    
-    if system == "Linux" and is_wsl:
-        # WSL 환경: D:\\ -> /mnt/d/
-        if windows_path.startswith("D:\\"):
-            return windows_path.replace("D:\\", "/mnt/d/").replace("\\", "/")
-        elif windows_path.startswith("C:\\"):
-            return windows_path.replace("C:\\", "/mnt/c/").replace("\\", "/")
+    def get_cross_platform_path(windows_path):
+        """레거시 경로 변환 함수 (fallback)"""
+        system = platform.system()
+        is_wsl = 'microsoft' in platform.uname().release.lower() or 'WSL' in platform.uname().release
+        
+        if system == "Linux" and is_wsl:
+            if windows_path.startswith("D:\\"):
+                return windows_path.replace("D:\\", "/mnt/d/").replace("\\", "/")
+            elif windows_path.startswith("C:\\"):
+                return windows_path.replace("C:\\", "/mnt/c/").replace("\\", "/")
+            else:
+                drive_letter = windows_path[0].lower()
+                return windows_path.replace(f"{windows_path[0]}:\\", f"/mnt/{drive_letter}/").replace("\\", "/")
         else:
-            # 다른 드라이브의 경우 일반적인 패턴 적용
-            drive_letter = windows_path[0].lower()
-            return windows_path.replace(f"{windows_path[0]}:\\", f"/mnt/{drive_letter}/").replace("\\", "/")
-    else:
-        # Windows 또는 기타 환경: 그대로 사용
-        return windows_path
+            return windows_path
+    
+    convert_path = get_cross_platform_path
+    platform_manager = None
 
 # 설정
-VAULT_PATH = get_cross_platform_path("D:\\GoogleDriveLaptop\\LifewithAI-20250120")
+VAULT_PATH = convert_path("D:\\GoogleDriveLaptop\\LifewithAI-20250120")
 
 # 법률 폴더 목록
 LEGAL_FOLDERS = [
@@ -129,36 +131,35 @@ def list_and_copy_folder_path(parent_dirs=None):
                 return
 
         # 크로스플랫폼 클립보드 복사
-        clipboard_success = False
-        
-        system = platform.system()
-        is_wsl = 'microsoft' in platform.uname().release.lower() or 'WSL' in platform.uname().release
-        
         try:
-            if system == "Linux" and is_wsl:
-                # WSL 환경: clip.exe 사용
-                subprocess.run(['clip.exe'], input=full_path.encode('utf-8'), check=True)
-                clipboard_success = True
-            elif system == "Windows":
-                # Windows: clip 명령어 사용
-                subprocess.run(['clip'], input=full_path.encode('utf-8'), check=True)
-                clipboard_success = True
-            elif system == "Darwin":
-                # macOS: pbcopy 사용
-                subprocess.run(['pbcopy'], input=full_path.encode('utf-8'), check=True)
-                clipboard_success = True
-            elif system == "Linux":
-                # Linux: xclip 시도 (설치되어 있는 경우)
-                try:
-                    subprocess.run(['xclip', '-selection', 'clipboard'], input=full_path.encode('utf-8'), check=True)
+            if platform_manager:
+                # 새로운 플랫폼 매니저 사용
+                clipboard_success = platform_manager.cmd.copy_to_clipboard(full_path)
+            else:
+                # 기존 방식 fallback
+                clipboard_success = False
+                system = platform.system()
+                is_wsl = 'microsoft' in platform.uname().release.lower() or 'WSL' in platform.uname().release
+                
+                if system == "Linux" and is_wsl:
+                    subprocess.run(['clip.exe'], input=full_path.encode('utf-8'), check=True)
                     clipboard_success = True
-                except (subprocess.CalledProcessError, FileNotFoundError):
-                    # xclip이 없으면 xsel 시도
+                elif system == "Windows":
+                    subprocess.run(['clip'], input=full_path.encode('utf-8'), check=True)
+                    clipboard_success = True
+                elif system == "Darwin":
+                    subprocess.run(['pbcopy'], input=full_path.encode('utf-8'), check=True)
+                    clipboard_success = True
+                elif system == "Linux":
                     try:
-                        subprocess.run(['xsel', '--clipboard', '--input'], input=full_path.encode('utf-8'), check=True)
+                        subprocess.run(['xclip', '-selection', 'clipboard'], input=full_path.encode('utf-8'), check=True)
                         clipboard_success = True
                     except (subprocess.CalledProcessError, FileNotFoundError):
-                        pass
+                        try:
+                            subprocess.run(['xsel', '--clipboard', '--input'], input=full_path.encode('utf-8'), check=True)
+                            clipboard_success = True
+                        except (subprocess.CalledProcessError, FileNotFoundError):
+                            pass
             
             if clipboard_success:
                 print(f"\n✅ 성공: {full_path} 경로가 클립보드에 복사되었습니다.")

@@ -1,70 +1,63 @@
 import os
 import shutil
-import platform
-import subprocess
 
-def get_cross_platform_path(windows_path):
-    """
-    Windows 경로를 현재 시스템에 맞는 경로로 변환합니다.
-    WSL 환경에서는 /mnt/d/ 형식으로, Windows에서는 그대로 사용합니다.
-    """
-    system = platform.system()
+# 통합 플랫폼 유틸리티 사용
+try:
+    from utils.platform_utils import get_platform_manager, convert_path, open_url
+    platform_manager = get_platform_manager()
+except ImportError:
+    # 기존 방식 fallback (호환성)
+    import platform
+    import subprocess
     
-    # WSL 환경 감지
-    is_wsl = 'microsoft' in platform.uname().release.lower() or 'WSL' in platform.uname().release
-    
-    if system == "Linux" and is_wsl:
-        # WSL 환경: D:\\ -> /mnt/d/
-        if windows_path.startswith("D:\\"):
-            return windows_path.replace("D:\\", "/mnt/d/").replace("\\", "/")
-        elif windows_path.startswith("C:\\"):
-            return windows_path.replace("C:\\", "/mnt/c/").replace("\\", "/")
-        else:
-            # 다른 드라이브의 경우 일반적인 패턴 적용
-            drive_letter = windows_path[0].lower()
-            return windows_path.replace(f"{windows_path[0]}:\\", f"/mnt/{drive_letter}/").replace("\\", "/")
-    else:
-        # Windows 또는 기타 환경: 그대로 사용
-        return windows_path
-
-def open_cross_platform_browser(url):
-    """
-    크로스플랫폼 방식으로 웹브라우저를 엽니다.
-    Windows, WSL, Linux, macOS를 지원합니다.
-    """
-    system = platform.system()
-    
-    # WSL 환경 감지
-    is_wsl = 'microsoft' in platform.uname().release.lower() or 'WSL' in platform.uname().release
-    
-    try:
+    def get_cross_platform_path(windows_path):
+        """레거시 경로 변환 함수 (fallback)"""
+        system = platform.system()
+        is_wsl = 'microsoft' in platform.uname().release.lower() or 'WSL' in platform.uname().release
+        
         if system == "Linux" and is_wsl:
-            # WSL 환경: wslview 사용
-            subprocess.run(['wslview', url], check=True)
-            return True
-        elif system == "Windows":
-            # Windows: 기본 브라우저 사용
-            os.startfile(url)
-            return True
-        elif system == "Darwin":
-            # macOS: open 명령어 사용
-            subprocess.run(['open', url], check=True)
-            return True
-        elif system == "Linux":
-            # 일반 Linux: xdg-open 사용
-            subprocess.run(['xdg-open', url], check=True)
-            return True
+            if windows_path.startswith("D:\\"):
+                return windows_path.replace("D:\\", "/mnt/d/").replace("\\", "/")
+            elif windows_path.startswith("C:\\"):
+                return windows_path.replace("C:\\", "/mnt/c/").replace("\\", "/")
+            else:
+                drive_letter = windows_path[0].lower()
+                return windows_path.replace(f"{windows_path[0]}:\\", f"/mnt/{drive_letter}/").replace("\\", "/")
         else:
-            # 기타 시스템: 지원하지 않음
-            print(f"지원하지 않는 시스템입니다: {system}")
+            return windows_path
+    
+    def open_cross_platform_browser(url):
+        """레거시 브라우저 열기 함수 (fallback)"""
+        system = platform.system()
+        is_wsl = 'microsoft' in platform.uname().release.lower() or 'WSL' in platform.uname().release
+        
+        try:
+            if system == "Linux" and is_wsl:
+                subprocess.run(['wslview', url], check=True)
+                return True
+            elif system == "Windows":
+                os.startfile(url)
+                return True
+            elif system == "Darwin":
+                subprocess.run(['open', url], check=True)
+                return True
+            elif system == "Linux":
+                subprocess.run(['xdg-open', url], check=True)
+                return True
+            else:
+                print(f"지원하지 않는 시스템입니다: {system}")
+                return False
+        except Exception as e:
+            print(f"브라우저 열기 실패: {e}")
             return False
-    except Exception as e:
-        print(f"브라우저 열기 실패: {e}")
-        return False
+    
+    convert_path = get_cross_platform_path
+    open_url = open_cross_platform_browser
+    platform_manager = None
 
 # 경로 설정
-source_folder = get_cross_platform_path(r"D:\전자소송다운로드")
-backup_base_folder = get_cross_platform_path(r"D:\전자소송다운로드_백업")
+source_folder = convert_path(r"D:\전자소송다운로드")
+backup_base_folder = convert_path(r"D:\전자소송다운로드_백업")
 temp_move_folder_name = "임시이동"
 target_folder = os.path.join(backup_base_folder, temp_move_folder_name)
 
@@ -109,7 +102,7 @@ def move_files_and_open_browser():
         print(f"'{url_to_open}' 웹 페이지를 엽니다...")
         
         # 크로스플랫폼 웹브라우저 열기
-        if open_cross_platform_browser(url_to_open):
+        if open_url(url_to_open):
             print("웹 페이지를 열었습니다.")
         else:
             print("웹 브라우저를 열 수 없습니다.")
