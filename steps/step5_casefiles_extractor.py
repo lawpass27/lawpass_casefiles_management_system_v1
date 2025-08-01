@@ -784,9 +784,9 @@ def extract_text_from_pdfs(case_folder, config, process_evidence=True):
     :return: 처리된 파일 수, 오류 목록
     """
     # 원본 폴더 경로
-    original_folder = os.path.join(case_folder, "원본폴더")
+    original_folder = os.path.join(case_folder, "원본자료")
     if not os.path.exists(original_folder):
-        error_msg = f"원본 폴더를 찾을 수 없습니다: {original_folder}"
+        error_msg = f"원본자료 폴더를 찾을 수 없습니다: {original_folder}"
         logging.error(error_msg)
         if RICH_AVAILABLE:
             console.print(f"[error]{error_msg}[/]")
@@ -1070,6 +1070,7 @@ def main():
     """메인 함수"""
     parser = argparse.ArgumentParser(description='PDF 파일에서 텍스트를 추출하여 마크다운 파일로 저장하는 스크립트')
     parser.add_argument('--case-folder', help='사건 폴더 경로')
+    parser.add_argument('--current-dir', action='store_true', help='현재 디렉토리를 사건 폴더로 사용')
     parser.add_argument('--evidence', action='store_true', help='7번 제출증거 파일도 처리')
     parser.add_argument('--config', default='config.yaml', help='설정 파일 경로')
     parser.add_argument('--debug', action='store_true', help='디버그 모드 활성화')
@@ -1119,7 +1120,14 @@ def main():
     # 사건 폴더 경로 가져오기
     case_folder = args.case_folder
     if not case_folder:
-        if config and config.get('general', {}).get('case_folder'):
+        if args.current_dir:
+            # --current-dir 플래그가 있으면 현재 디렉토리 사용
+            case_folder = os.getcwd()
+            if RICH_AVAILABLE:
+                console.print(f"[info]현재 디렉토리를 사건 폴더로 사용합니다: {case_folder}[/]")
+            else:
+                print(f"현재 디렉토리를 사건 폴더로 사용합니다: {case_folder}")
+        elif config and config.get('general', {}).get('case_folder'):
             case_folder = config['general']['case_folder']
         else:
             case_folder = get_case_folder()

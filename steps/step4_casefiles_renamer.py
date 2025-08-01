@@ -179,6 +179,10 @@ def parse_filename(filename, config=None):
         elif is_appeal_reason_file(filename, prefix_patterns):
             new_filename = rename_appeal_reason_file(filename)
         
+        # 지급명령결정문 확인 (판결문보다 먼저 확인)
+        elif is_payment_order_decision_file(filename, prefix_patterns):
+            new_filename = rename_payment_order_decision_file(filename)
+        
         # 판결문 확인
         elif is_judgment_file(filename, prefix_patterns):
             new_filename = rename_judgment_file(filename)
@@ -264,7 +268,7 @@ def is_document_type(filename, prefix_patterns):
 
 def is_judgment_file(filename, prefix_patterns):
     """파일이 판결문인지 확인"""
-    judgment_patterns = get_patterns_for_prefix("9_판결_", prefix_patterns)
+    judgment_patterns = get_patterns_for_prefix("9_판결등_", prefix_patterns)
     return "판결문" in filename and any("판결문" in pattern for pattern in judgment_patterns)
 
 def is_judgment_declaration_file(filename, prefix_patterns):
@@ -276,6 +280,11 @@ def is_appeal_reason_file(filename, prefix_patterns):
     """파일이 항소이유서인지 확인"""
     document_patterns = get_patterns_for_prefix("8_제출서면_", prefix_patterns)
     return "항소이유서" in filename and any("항소이유서" in pattern for pattern in document_patterns)
+
+def is_payment_order_decision_file(filename, prefix_patterns):
+    """파일이 지급명령결정문인지 확인"""
+    judgment_patterns = get_patterns_for_prefix("9_판결등_", prefix_patterns)
+    return "지급명령결정문" in filename
 
 # 증거 파일(갑/을) 이름 변경
 def rename_evidence_file(filename):
@@ -468,11 +477,18 @@ def rename_document_file(filename):
         formatted_date = f"{year}.{month}.{day}"
         
         # 문서 종류 추출
-        doc_types = ["항소장", "소장", "답변서", "준비서면", "신청서", "변론조서", "기일변경신청서"]
+        doc_types = ["항소장", "소장", "답변서", "준비서면", "신청서", "변론조서", "기일변경신청서", "의견서", "조정기일조서", "변론기일조서"]
         doc_type = ""
         
-        # 항소장 먼저 확인 (소장보다 우선순위 높게)
-        if "항소장" in filename:
+        # 특수한 경우들 먼저 처리
+        if "이의신청서" in filename:
+            doc_type = "지급명령 이의신청서"
+        elif "변경신청서" in filename and "청구" not in filename:
+            doc_type = "청구취지 및 청구원인 변경신청서"
+        elif "의견서" in filename or (filename.endswith("_원고.pdf") and not any(dt in filename for dt in doc_types)):
+            doc_type = "조정에 대한 의견서"
+        # 항소장 확인 (소장보다 우선순위 높게)
+        elif "항소장" in filename:
             doc_type = "항소장"
         else:
             for dt in doc_types:
@@ -480,10 +496,20 @@ def rename_document_file(filename):
                     doc_type = dt
                     break
         
-        # 추가 정보 추출 (변론조서 회차 등)
+        # 추가 정보 추출 (변론조서, 조정기일조서, 변론기일조서 회차 등)
         additional_info = ""
         if "변론조서" in filename:
             round_pattern = r"변론조서 \((\d+)회\)"
+            round_match = re.search(round_pattern, filename)
+            if round_match:
+                additional_info = f"({round_match.group(1)}회)"
+        elif "조정기일조서" in filename:
+            round_pattern = r"조정기일조서 \((\d+)회\)"
+            round_match = re.search(round_pattern, filename)
+            if round_match:
+                additional_info = f"({round_match.group(1)}회)"
+        elif "변론기일조서" in filename:
+            round_pattern = r"변론기일조서 \((\d+)회\)"
             round_match = re.search(round_pattern, filename)
             if round_match:
                 additional_info = f"({round_match.group(1)}회)"
@@ -616,6 +642,30 @@ def rename_appeal_reason_file(filename):
     
     return None
 
+# 지급명령결정문 파일 이름 변경
+def rename_payment_order_decision_file(filename):
+    """지급명령결정문 파일 이름 변경"""
+    # 날짜 추출
+    date_pattern = r"_(\d{4}\.\d{2}\.\d{2})_"
+    date_match = re.search(date_pattern, filename)
+    
+    if date_match:
+        date = date_match.group(1).replace(".", "").strip()
+        year = date[:4]
+        month = date[4:6]
+        day = date[6:8]
+        formatted_date = f"{year}.{month}.{day}"
+        
+        # 파일 확장자 추출
+        ext = os.path.splitext(filename)[1]
+        
+        # 새 파일명 생성
+        new_filename = f"{formatted_date}.자_지급명령결정문{ext}"
+        
+        return new_filename
+    
+    return None
+
 # 증인 신문사항 파일 이름 변경
 def rename_witness_question_file(filename):
     """증인 신문사항 파일 이름 변경"""
@@ -658,7 +708,7 @@ def rename_witness_question_file(filename):
     return None
 
 # 파일 이름 변경 실행
-def rename_files(case_folder, original_folder_name="원본폴더", config=None):
+def rename_files(case_folder, original_folder_name="원본자료", config=None):
     """파일 이름 변경 실행"""
     # 원본 폴더 경로
     original_folder = os.path.join(case_folder, original_folder_name)
@@ -815,10 +865,34 @@ def apply_prefix_rules(filename, prefix_patterns):
     
     # 판결문 특별 처리
     if "판결문" in name:
-        return f"9_판결_{filename}"
+        return f"9_판결등_{filename}"
+    
+    # 지급명령결정문 특별 처리
+    if "지급명령결정문" in name:
+        return f"9_판결등_{filename}"
     
     # 항소이유서 특별 처리
     if "항소이유서" in name:
+        return f"8_제출서면_{filename}"
+    
+    # 이의신청서 특별 처리
+    if "이의신청서" in name:
+        return f"8_제출서면_{filename}"
+    
+    # 변경신청서 특별 처리 (청구 관련 제외)
+    if "변경신청서" in name and "청구" not in name:
+        return f"8_제출서면_{filename}"
+    
+    # 의견서 특별 처리 (조정에 대한 의견서 포함)
+    if "의견서" in name:
+        return f"8_제출서면_{filename}"
+    
+    # 조정기일조서 특별 처리
+    if "조정기일조서" in name:
+        return f"8_제출서면_{filename}"
+    
+    # 변론기일조서 특별 처리
+    if "변론기일조서" in name:
         return f"8_제출서면_{filename}"
     
     # 사실조회 회신서 특별 처리
@@ -887,7 +961,7 @@ def remove_duplicate_phrases(filename):
     return name + ext
 
 # 파일 이름에 접두어 추가
-def add_prefixes_to_files(case_folder, renamed_files, original_folder_name="원본폴더", config=None):
+def add_prefixes_to_files(case_folder, renamed_files, original_folder_name="원본자료", config=None):
     """파일 이름에 접두어 추가 (2차 파일명 변경)"""
     # 원본 폴더 경로
     original_folder = os.path.join(case_folder, original_folder_name)
@@ -1053,7 +1127,7 @@ def add_prefixes_to_files(case_folder, renamed_files, original_folder_name="원�
     return renamed_count, errors
 
 # 변경되지 않은 파일을 "절차관련" 폴더로 이동
-def move_unchanged_files(case_folder, renamed_files, original_folder_name="원본폴더", config=None):
+def move_unchanged_files(case_folder, renamed_files, original_folder_name="원본자료", config=None):
     """변경되지 않은 파일을 지정된 폴더로 이동"""
     # 원본 폴더 경로
     original_folder = os.path.join(case_folder, original_folder_name)
@@ -1200,6 +1274,7 @@ def main():
     parser.add_argument('--skip-second-phase', action='store_true', help='2차 파일명 변경 건너뛰기')
     parser.add_argument('--skip-move-unchanged', action='store_true', help='변경되지 않은 파일 이동 건너뛰기')
     parser.add_argument('--target-folder', help='변경되지 않은 파일을 이동할 대상 폴더명', default='절차관련')
+    parser.add_argument('--current-dir', '-c', action='store_true', help='현재 디렉토리를 사건 폴더로 사용')
     
     args = parser.parse_args()
     
@@ -1247,11 +1322,19 @@ def main():
     # 설정 파일에서 값 가져오기
     original_folder_name = args.original_folder
     if not original_folder_name and config:
-        original_folder_name = config.get('file_management', {}).get('original_folder_name', '원본폴더')
+        original_folder_name = config.get('file_management', {}).get('original_folder_name', '원본자료')
     
     # 사건 폴더 경로 가져오기
     case_folder = args.case_folder
-    if not case_folder:
+    
+    # --current-dir 플래그가 설정된 경우 현재 디렉토리 사용
+    if args.current_dir:
+        case_folder = os.getcwd()
+        if RICH_AVAILABLE:
+            console.print(f"[info]현재 디렉토리를 사건 폴더로 사용합니다: {case_folder}[/]")
+        else:
+            print(f"현재 디렉토리를 사건 폴더로 사용합니다: {case_folder}")
+    elif not case_folder:
         if config and config.get('general', {}).get('case_folder'):
             case_folder = config['general']['case_folder']
         else:

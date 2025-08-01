@@ -102,22 +102,22 @@ def setup_logging(level="INFO", log_file=None):
         stream_handler.setFormatter(formatter)
         handlers.append(stream_handler)
 
-    # File Handler (경로가 제공된 경우)
-    if log_file:
-        try:
-            log_dir = os.path.dirname(log_file)
-            if log_dir and not os.path.exists(log_dir):
-                os.makedirs(log_dir)
-            from logging.handlers import RotatingFileHandler
-            # 5MB 크기, 3개 백업
-            file_handler = RotatingFileHandler(log_file, maxBytes=5*1024*1024, backupCount=3, encoding='utf-8')
-            file_handler.setLevel(numeric_level)
-            formatter = logging.Formatter(log_format, date_format)
-            file_handler.setFormatter(formatter)
-            handlers.append(file_handler)
-            print(f"정보: 로그 파일 저장 위치: {log_file}")
-        except Exception as e:
-            print(f"오류: 로그 파일 핸들러 설정 실패 - {e}")
+    # File Handler (경로가 제공된 경우) - 로그 파일 생성 비활성화
+    # if log_file:
+    #     try:
+    #         log_dir = os.path.dirname(log_file)
+    #         if log_dir and not os.path.exists(log_dir):
+    #             os.makedirs(log_dir)
+    #         from logging.handlers import RotatingFileHandler
+    #         # 5MB 크기, 3개 백업
+    #         file_handler = RotatingFileHandler(log_file, maxBytes=5*1024*1024, backupCount=3, encoding='utf-8')
+    #         file_handler.setLevel(numeric_level)
+    #         formatter = logging.Formatter(log_format, date_format)
+    #         file_handler.setFormatter(formatter)
+    #         handlers.append(file_handler)
+    #         print(f"정보: 로그 파일 저장 위치: {log_file}")
+    #     except Exception as e:
+    #         print(f"오류: 로그 파일 핸들러 설정 실패 - {e}")
 
     # 핸들러 추가
     for handler in handlers:
@@ -899,9 +899,9 @@ def main():
         description='지정된 폴더 내 모든 PDF/이미지 파일 또는 단일 PDF/이미지 파일에서 텍스트를 추출하여 마크다운으로 저장합니다.',
         formatter_class=argparse.RawTextHelpFormatter
     )
-    # input_path 인수는 더 이상 필수가 아님 (항상 입력받도록 변경)
+    # input_path 인수 - 이제 명령행에서 직접 지정 가능
     parser.add_argument('--input_path', default=None,
-                        help='[사용되지 않음] 텍스트를 추출할 폴더 또는 파일 경로 (이제 항상 입력 요청)')
+                        help='텍스트를 추출할 폴더 또는 파일 경로 (지정하지 않으면 입력 요청)')
     # 프로젝트 루트의 config.yaml 파일 경로로 수정
     parser.add_argument('--config', '-c', default=os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'config.yaml'),
                         help='사용자 설정 파일 경로 (기본값: 프로젝트 루트의 config.yaml)')
@@ -934,16 +934,16 @@ def main():
         # 디렉토리 경로 확보
         log_dir = os.path.dirname(final_log_file_path)
 
-    # 로그 디렉토리 생성 (필요시)
-    if log_dir and not os.path.exists(log_dir):
-         try:
-              os.makedirs(log_dir)
-         except OSError as e:
-              print(f"경고: 로그 디렉토리 생성 실패 '{log_dir}' - {e}")
-              final_log_file_path = None # 파일 로깅 비활성화
+    # 로그 디렉토리 생성 (필요시) - 로그 파일 생성 비활성화
+    # if log_dir and not os.path.exists(log_dir):
+    #      try:
+    #           os.makedirs(log_dir)
+    #      except OSError as e:
+    #           print(f"경고: 로그 디렉토리 생성 실패 '{log_dir}' - {e}")
+    #           final_log_file_path = None # 파일 로깅 비활성화
 
-    # 로깅 설정 적용
-    setup_logging(args.log_level, final_log_file_path)
+    # 로깅 설정 적용 - 파일 로깅 비활성화를 위해 None 전달
+    setup_logging(args.log_level, None)  # final_log_file_path 대신 None 전달
 
     # 설정 로드 및 병합
     user_config = load_config(args.config)
@@ -964,36 +964,50 @@ def main():
     logger.info(f"사용될 Google Credentials 경로: {creds_check if creds_check else '설정되지 않음'}")
 
 
-    # --- 항상 사용자에게 경로 입력 요청 ---
-    prompt = "[question]텍스트를 추출할 폴더 또는 파일 경로를 입력하세요:[/]"
-    input_path = None # 초기화
-    while not input_path: # 유효한 경로가 입력될 때까지 반복
-        try:
-            if RICH_AVAILABLE:
-                input_path = console.input(prompt)
-            else:
-                input_path = input("텍스트를 추출할 폴더 또는 파일 경로를 입력하세요: ")
-            input_path = input_path.strip().strip('"\'') # 따옴표 제거 추가
+    # --- 경로 결정: 명령행 인수 또는 사용자 입력 ---
+    input_path = args.input_path  # 명령행 인수 확인
+    
+    if not input_path:
+        # 명령행 인수가 없으면 사용자에게 입력 요청
+        prompt = "[question]텍스트를 추출할 폴더 또는 파일 경로를 입력하세요:[/]"
+        while not input_path: # 유효한 경로가 입력될 때까지 반복
+            try:
+                if RICH_AVAILABLE:
+                    input_path = console.input(prompt)
+                else:
+                    input_path = input("텍스트를 추출할 폴더 또는 파일 경로를 입력하세요: ")
+                input_path = input_path.strip().strip('"\'') # 따옴표 제거 추가
 
-            if not input_path:
-                print_message("오류: 경로가 입력되지 않았습니다. 다시 입력해주세요.", "error")
-                continue # 다시 입력 요청
+                if not input_path:
+                    print_message("오류: 경로가 입력되지 않았습니다. 다시 입력해주세요.", "error")
+                    continue # 다시 입력 요청
 
-            # 입력받은 경로 정규화 및 절대 경로 변환
-            input_path = os.path.normpath(os.path.abspath(input_path))
+                # 입력받은 경로 정규화 및 절대 경로 변환
+                input_path = os.path.normpath(os.path.abspath(input_path))
 
-            # 경로 존재 여부 확인
-            if not os.path.exists(input_path):
-                print_message(f"오류: 입력된 경로를 찾을 수 없습니다: '{input_path}'. 다시 입력해주세요.", "error")
-                input_path = None # 경로 초기화하여 다시 입력받도록 함
-                continue # 다시 입력 요청
+                # 경로 존재 여부 확인
+                if not os.path.exists(input_path):
+                    print_message(f"오류: 입력된 경로를 찾을 수 없습니다: '{input_path}'. 다시 입력해주세요.", "error")
+                    input_path = None # 경로 초기화하여 다시 입력받도록 함
+                    continue # 다시 입력 요청
 
-            logger.info(f"처리 대상 경로: {input_path}")
-            break # 유효한 경로 입력 시 루프 탈출
+                logger.info(f"처리 대상 경로: {input_path}")
+                break # 유효한 경로 입력 시 루프 탈출
 
-        except (EOFError, KeyboardInterrupt):
-            print_message("\n입력 취소. 스크립트를 종료합니다.", "warning")
-            sys.exit(0)
+            except (EOFError, KeyboardInterrupt):
+                print_message("\n입력 취소. 스크립트를 종료합니다.", "warning")
+                sys.exit(0)
+    else:
+        # 명령행 인수가 제공된 경우
+        input_path = input_path.strip().strip('"\'')
+        input_path = os.path.normpath(os.path.abspath(input_path))
+        
+        # 경로 존재 여부 확인
+        if not os.path.exists(input_path):
+            print_message(f"오류: 입력된 경로를 찾을 수 없습니다: '{input_path}'", "error")
+            sys.exit(1)
+        
+        logger.info(f"처리 대상 경로 (명령행 인수): {input_path}")
 
     # --- 경로 처리 실행 ---
     # input_path가 None이 아닌 경우 (유효한 경로가 입력된 경우)에만 처리 실행
