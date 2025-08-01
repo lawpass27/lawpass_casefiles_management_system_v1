@@ -9,6 +9,10 @@ import time
 import platform
 import shutil
 
+# Import platform utilities for cross-platform compatibility
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from utils.platform_utils import get_platform_manager
+
 def is_wsl():
     """WSL 환경인지 감지"""
     try:
@@ -20,29 +24,31 @@ def is_wsl():
 
 def get_platform_paths():
     """플랫폼별 경로 자동 감지"""
-    if platform.system() == "Windows":
+    platform_manager = get_platform_manager()
+    
+    if platform_manager.info.is_windows:
         # Windows 환경
         vault_path = r"D:\\GoogleDriveLaptop\\LifewithAI-20250120"
         output_path = r"D:\\GoogleDriveLaptop\\LifewithAI-20250120\\1700_Legalcases_repomix"
-    elif is_wsl():
+    elif platform_manager.info.is_wsl:
         # WSL 환경
         vault_path = "/mnt/d/GoogleDriveLaptop/LifewithAI-20250120"
         output_path = "/mnt/d/GoogleDriveLaptop/LifewithAI-20250120/1700_Legalcases_repomix"
+    elif platform_manager.info.is_mac:
+        # macOS 환경
+        vault_path = "/Users/lawpass/GoogleDriveMac/LifewithAI-20250120"
+        output_path = "/Users/lawpass/GoogleDriveMac/LifewithAI-20250120/1700_Legalcases_repomix"
     else:
-        # Linux/macOS 환경 (일반적으로 마운트 포인트 다름)
-        vault_path = "/mnt/d/GoogleDriveLaptop/LifewithAI-20250120"
-        output_path = "/mnt/d/GoogleDriveLaptop/LifewithAI-20250120/1700_Legalcases_repomix"
+        # Linux 환경 (일반적으로 마운트 포인트 다름)
+        vault_path = "/Users/lawpass/GoogleDriveMac/LifewithAI-20250120"
+        output_path = "/Users/lawpass/GoogleDriveMac/LifewithAI-20250120/1700_Legalcases_repomix"
     
     return vault_path, output_path
 
 def get_environment_type():
     """환경 타입 반환"""
-    if platform.system() == "Windows":
-        return "windows"
-    elif is_wsl():
-        return "wsl"
-    else:
-        return "linux"
+    platform_manager = get_platform_manager()
+    return platform_manager.info.platform_id
 
 # 설정 - 플랫폼별 경로 (자동 감지)
 # Windows: VAULT_PATH = r"D:\GoogleDriveLaptop\LifewithAI-20250120"

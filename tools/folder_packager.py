@@ -6,6 +6,9 @@ import os
 import sys
 import subprocess
 from datetime import datetime
+# Import platform utilities for cross-platform compatibility
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from utils.platform_utils import get_platform_manager
 
 def package_folder(folder_path):
     """
@@ -39,8 +42,13 @@ def package_folder(folder_path):
         
         # repomix 실행
         print(f"폴더 처리 중: {folder_path}")
+        
+        # Get the correct npm command for the current platform
+        platform_manager = get_platform_manager()
+        npm_cmd = platform_manager.cmd.get_npm_command()
+        
         command = [
-            "npm.cmd",
+            npm_cmd,
             "exec",
             "--yes",  # 자동으로 yes 응답
             "repomix",
