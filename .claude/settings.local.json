@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "allow": [
+      "Bash(mkdir:*)",
+      "Bash(pip install:*)",
+      "Bash(python:*)",
+      "Bash(source:*)",
+      "Bash(rm:*)",
+      "Bash(uv venv:*)",
+      "Bash(uv pip install:*)",
+      "Bash(uv pip:*)",
+      "Bash(sudo apt:*)",
+      "Bash(sudo apt install:*)",
+      "Bash(ffmpeg:*)",
+      "Bash(find:*)",
+      "Bash(where python)",
+      "Bash(\"D:\\Scripts\\lawpass_casefiles_management_system_v1\\python\" steps/step5_casefiles_extractor.py --evidence)",
+      "Bash(ls:*)",
+      "Bash(\"/c/Users/lawpass/AppData/Local/Programs/Python/Python312/python.exe\" --version)",
+      "Bash(\"/c/Users/lawpass/AppData/Local/Programs/Python/Python312/python.exe\" steps/step5_casefiles_extractor.py --evidence)",
+      "Bash(\"/c/Users/lawpass/AppData/Local/Programs/Python/Python312/python.exe\" -m pip install PyYAML)",
+      "Bash(\"/c/Users/lawpass/AppData/Local/Programs/Python/Python312/python.exe\" -m pip install google-cloud-vision pillow pdf2image python-dotenv rich)",
+      "Bash(\"/c/Users/lawpass/AppData/Local/Programs/Python/Python312/python.exe\" steps/step5_casefiles_extractor.py --case-folder \"D:\\GoogleDriveLaptop\\LifewithAI-20250120\\1001_LAWmi_Test\\민사_(주)리하온_(주)타이거_물품대금\" --evidence)",
+      "Bash(PYTHONIOENCODING=utf-8 \"/c/Users/lawpass/AppData/Local/Programs/Python/Python312/python.exe\" steps/step5_casefiles_extractor.py --case-folder \"D:\\GoogleDriveLaptop\\LifewithAI-20250120\\1001_LAWmi_Test\\민사_(주)리하온_(주)타이거_물품대금\" --evidence)",
+      "Bash(PYTHONIOENCODING=utf-8 \"/c/Users/lawpass/AppData/Local/Programs/Python/Python312/python.exe\" tools/casefiles_extractor_by_input.py)",
+      "Bash(\"/c/Users/lawpass/AppData/Local/Programs/Python/Python312/python.exe\" tools/casefiles_extractor_by_input.py --help)",
+      "Bash(PYTHONIOENCODING=utf-8 \"/c/Users/lawpass/AppData/Local/Programs/Python/Python312/python.exe\" tools/casefiles_extractor_by_input.py --input_path \"D:\\GoogleDriveLaptop\\LifewithAI-20250120\\1001_LAWmi_Test\\민사_(주)리하온_(주)타이거_물품대금\\원본자료\\8_제출서면_2024.10.02.자_지급명령신청서_원고.pdf\")",
+      "Bash(powershell:*)",
+      "Bash(cmd /c:*)",
+      "Bash(chcp:*)",
+      "Bash(cmd //c:*)",
+      "Bash(echo:*)",
+      "Bash(winpty powershell:*)"
+    ],
+    "deny": []
+  }
+}

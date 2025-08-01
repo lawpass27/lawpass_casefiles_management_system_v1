@@ -231,6 +231,39 @@ def main():
             return 1
 
     print("\n✅ Step 4까지 모든 스텝이 성공적으로 완료되었습니다!")
+    
+    # Step 4 이후 자동 평가 및 개선 작업 실행
+    print("\n" + "="*50)
+    print("전처리 결과 평가 및 개선 작업 시작")
+    print("="*50)
+    
+    # 사용자에게 평가 작업 실행 여부 확인
+    while True:
+        choice = input("\n전처리 결과를 평가하고 개선사항을 확인하시겠습니까? (y: 실행, n: 건너뛰기, 엔터: 실행): ").lower()
+        if choice == 'y' or choice == '':
+            # step4_postprocess_review.py 실행
+            review_script = os.path.join(os.path.dirname(os.path.abspath(__file__)), "steps", "step4_postprocess_review.py")
+            if os.path.exists(review_script):
+                try:
+                    print("\n평가 작업을 시작합니다...")
+                    result = subprocess.run([sys.executable, review_script, case_folder],
+                                         capture_output=False, text=True)
+                    
+                    if result.returncode == 0:
+                        print("\n✅ 평가 및 개선 작업이 완료되었습니다!")
+                    else:
+                        print("\n⚠️ 평가 작업 중 일부 문제가 발생했습니다.")
+                except Exception as e:
+                    print(f"\n❌ 평가 작업 실행 중 오류 발생: {e}")
+            else:
+                print("\n⚠️ 평가 스크립트를 찾을 수 없습니다. 평가 작업을 건너뜁니다.")
+            break
+        elif choice == 'n':
+            print("평가 작업을 건너뜁니다.")
+            break
+        else:
+            print("잘못된 입력입니다. 'y', 'n' 또는 엔터를 입력하세요.")
+    
     return 0
 
 if __name__ == "__main__":
